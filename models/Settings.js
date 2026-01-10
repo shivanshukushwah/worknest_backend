@@ -1,0 +1,18 @@
+const mongoose = require('mongoose')
+
+const settingsSchema = new mongoose.Schema(
+  {
+    platformUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    // future settings can be added here
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+  },
+  { timestamps: true }
+)
+
+module.exports = mongoose.model('Settings', settingsSchema)
