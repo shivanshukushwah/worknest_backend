@@ -33,6 +33,16 @@ const jobSchema = new mongoose.Schema({
   acceptedCount: { type: Number, default: 0 },
   // jobType: 'offline' or 'online'
   jobType: { type: String, enum: ['offline', 'online'], default: 'offline' },
+  // Location (for offline jobs)
+  location: {
+    city: String,
+    state: String,
+    country: String,
+    coordinates: {
+      latitude: Number,
+      longitude: Number,
+    },
+  },
   // For online jobs, multiplier controls shortlist size
   shortlistMultiplier: { type: Number, default: 3 },
   // Shortlisting window: end time and window length in hours
@@ -42,6 +52,8 @@ const jobSchema = new mongoose.Schema({
   shortlistComputed: { type: Boolean, default: false },
   shortlistedAt: { type: Date },
   status: { type: String, default: JOB_STATUS.OPEN },
+  closedAt: { type: Date },
+  shortlistedAt: { type: Date },
   escrowAmount: { type: Number, default: 0 },
   paymentReleased: { type: Boolean, default: false },
   studentAccepted: { type: Boolean, default: false },

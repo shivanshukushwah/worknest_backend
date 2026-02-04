@@ -1,10 +1,44 @@
 const Job = require('../models/Job')
 const NotificationService = require('./notificationService')
 const mongoose = require('mongoose')
-const { NOTIFICATION_TYPES } = require('../utils/constants')
+const { NOTIFICATION_TYPES, JOB_STATUS } = require('../utils/constants')
 
 let intervalHandle = null
 
+// Process offline jobs: auto-close when FCFS limit reached
+async function processOfflineJobAutoClose() {
+  try {
+    const now = new Date()
+    // Find open offline jobs that have reached or exceeded FCFS application limit
+    const offlineJobs = await Job.find({ jobType: 'offline', status: JOB_STATUS.OPEN })
+
+    for (const job of offlineJobs) {
+      const maxApplications = (job.positionsRequired || 1) * 3 // FCFS limit: 3× positionsRequired
+      const currentApplications = (job.applications || []).length
+
+      // Auto-close job if FCFS limit reached
+      if (currentApplications >= maxApplications) {
+        job.status = JOB_STATUS.CLOSED
+        job.closedAt = new Date()
+        await job.save()
+
+        // Notify employer
+        await NotificationService.createAndSendNotification({
+          recipientId: job.employer,
+          senderId: null,
+          type: NOTIFICATION_TYPES.JOB_CLOSED,
+          title: 'Job automatically closed',
+          message: `Your job "${job.title}" has been automatically closed after reaching the FCFS application limit (${maxApplications} applications).`,
+          jobId: job._id,
+        })
+      }
+    }
+  } catch (err) {
+    console.error('Offline job auto-close error:', err)
+  }
+}
+
+// Process online jobs: auto-shortlist after time window expires
 async function processDueShortlists() {
   try {
     const now = new Date()
@@ -83,9 +117,13 @@ async function processDueShortlists() {
 function startShortlistScheduler({ intervalMs = 60 * 1000 } = {}) {
   if (intervalHandle) return
   // Run immediately and then at interval
+  processOfflineJobAutoClose()
   processDueShortlists()
-  intervalHandle = setInterval(processDueShortlists, intervalMs)
-  console.log('Shortlist scheduler started (intervalMs=', intervalMs, ')')
+  intervalHandle = setInterval(async () => {
+    await processOfflineJobAutoClose()
+    await processDueShortlists()
+  }, intervalMs)
+  console.log('Shortlist & auto-close scheduler started (intervalMs=', intervalMs, ')')
 }
 
 function stopShortlistScheduler() {

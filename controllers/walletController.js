@@ -30,18 +30,17 @@ const getWallet = async (req, res) => {
 // @access  Private
 const createWallet = async (req, res) => {
   try {
-    // Ensure user has phone and phone is verified before creating wallet
-    const user = await User.findById(req.user.id).select('phone isPhoneVerified role email')
+    // Ensure user has completed profile before creating wallet
+    const user = await User.findById(req.user.id).select('phone isPhoneVerified role email businessName businessAddress skills education')
     if (!user) {
       return ResponseHelper.error(res, "User not found", 404)
     }
 
-    if (!user.phone) {
-      return ResponseHelper.error(res, "Phone number required to create a wallet. Please add and verify your phone.", 400)
-    }
-
-    if (!user.isPhoneVerified) {
-      return ResponseHelper.error(res, "Phone number not verified. Please verify your phone before creating a wallet.", 403)
+    const { validateProfileCompletion, getMissingFieldsMessage } = require('../services/profileValidation')
+    const profileValidation = validateProfileCompletion(user)
+    if (!profileValidation.isComplete) {
+      const msg = getMissingFieldsMessage(profileValidation.missingFields)
+      return ResponseHelper.error(res, msg, 400)
     }
 
     const existing = await Wallet.findOne({ user: req.user.id })

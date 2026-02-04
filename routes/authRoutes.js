@@ -14,6 +14,12 @@ router.post("/verify-otp", authController.verifyOtp)
 // Resend OTP
 router.post("/resend-otp", authController.resendOtp)
 
+// Forgot password - send reset email
+router.post("/forgot-password", authController.forgotPassword)
+
+// Reset password - verify token and set new password
+router.post("/reset-password", authController.resetPassword)
+
 // Optional: logout, refresh token, etc.
 router.post("/logout", authController.logout)
 

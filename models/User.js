@@ -9,9 +9,14 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, unique: true, sparse: true },
     isPhoneVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
+    isProfileComplete: { type: Boolean, default: false },
+    // OTP fields
     phoneOtp: String,
+    phoneOtpHash: String,
     phoneOtpExpires: Date,
     phoneOtpSentAt: Date,
+    phoneOtpAttempts: { type: Number, default: 0 },
+    phoneOtpBlocked: { type: Boolean, default: false },
 
     // Business fields (for employers)
     businessName: String,
@@ -32,6 +37,17 @@ const userSchema = new mongoose.Schema(
     skills: [String],
     avatar: String,
     profilePicture: String,
+    
+    // Location field (for students)
+    location: {
+      city: String,
+      state: String,
+      country: String,
+      coordinates: {
+        latitude: Number,
+        longitude: Number,
+      },
+    },
 
     // Rating & education
     rating: {
@@ -45,6 +61,10 @@ const userSchema = new mongoose.Schema(
     },
     lastLogin: Date,
     score: { type: Number, default: function() { return this.role === 'student' ? 35 : 0 } },
+
+    // Password reset fields
+    resetPasswordToken: String,
+    resetPasswordExpires: Date,
   },
   { timestamps: true }
 )

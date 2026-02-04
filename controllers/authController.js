@@ -1,7 +1,9 @@
 const User = require("../models/User")
 const jwt = require("jsonwebtoken")
 const bcrypt = require("bcrypt")
-const { validateSignup, validateLogin } = require("../validators/authValidator")
+const crypto = require("crypto")
+const smsService = require("../services/smsService")
+const { validateSignup, validateLogin, validateForgotPassword, validateResetPassword } = require("../validators/authValidator")
 
 if (!process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET missing in environment")
@@ -24,7 +26,12 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: error.details[0].message })
     }
 
-    const { name, email, password, role, phone, businessName, businessType, businessLocation, businessCity } = req.body
+    const { name, email, password, confirmPassword, role, phone, location, businessName, businessType, businessLocation, businessCity } = req.body
+
+    // Verify passwords match (additional safeguard, though Joi should catch this)
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords do not match" })
+    }
 
     const existingEmail = await User.findOne({ email })
     if (existingEmail) {
@@ -48,6 +55,14 @@ exports.register = async (req, res) => {
       isPhoneVerified: false,
     }
 
+    if (role === 'student' && location) {
+      userData.location = {
+        city: location.city,
+        state: location.state,
+        country: location.country,
+      }
+    }
+
     if (role === 'employer') {
       userData.businessName = businessName
       userData.businessType = businessType
@@ -65,15 +80,26 @@ exports.register = async (req, res) => {
 
     const user = await User.create(userData)
 
-    // Generate OTP and send (for now, log it - integrate with SMS provider later)
+    // Generate OTP, hash and send via SMS provider
     const otp = generateNumericOtp(6)
-    user.phoneOtp = otp
-    user.phoneOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+    const otpHash = await bcrypt.hash(otp, 10)
+    user.phoneOtpHash = otpHash
+    // OTP valid for 5 minutes
+    user.phoneOtpExpires = new Date(Date.now() + 5 * 60 * 1000)
+    user.phoneOtpSentAt = new Date()
+    user.phoneOtpAttempts = 0
+    user.phoneOtpBlocked = false
+    // Keep raw OTP only in test env for assertions
+    if (process.env.NODE_ENV === 'test') user.phoneOtp = otp
+    else user.phoneOtp = undefined
     await user.save()
 
-    console.log(`OTP for ${phone}:`, otp) // In production, send via SMS provider
+    const sent = await smsService.sendSms(phone, `Your verification OTP is ${otp}. It will expire in 5 minutes.`)
+    if (!sent) {
+      return res.status(500).json({ message: 'SMS provider not configured' })
+    }
 
-    res.status(201).json({ success: true, message: "User created. OTP sent to phone - verify using /api/auth/verify-otp" })
+    res.status(201).json({ success: true, message: "OTP sent successfully to your mobile number." })
   } catch (err) {
     console.error("Register error:", err)
     res.status(500).json({ message: "Server error" })
@@ -137,19 +163,43 @@ exports.verifyOtp = async (req, res) => {
     const user = await User.findOne({ phone })
     if (!user) return res.status(404).json({ message: 'User not found' })
 
-    if (!user.phoneOtp || !user.phoneOtpExpires || new Date() > user.phoneOtpExpires) {
-      return res.status(400).json({ message: 'OTP expired or not found. Request a new OTP.' })
+    if (user.phoneOtpBlocked) {
+      return res.status(400).json({ message: 'Too many attempts. Try again later.' })
     }
 
-    if (user.phoneOtp !== otp.toString()) {
-      return res.status(400).json({ message: 'Invalid OTP' })
+    if (!user.phoneOtpHash || !user.phoneOtpExpires || new Date() > user.phoneOtpExpires) {
+      // clear fields if expired
+      user.phoneOtpHash = undefined
+      user.phoneOtp = undefined
+      user.phoneOtpExpires = undefined
+      user.phoneOtpSentAt = undefined
+      user.phoneOtpAttempts = 0
+      user.phoneOtpBlocked = false
+      await user.save()
+      return res.status(400).json({ message: 'OTP expired. Please request a new one.' })
+    }
+
+    const match = await bcrypt.compare(otp.toString(), user.phoneOtpHash)
+    if (!match) {
+      user.phoneOtpAttempts = (user.phoneOtpAttempts || 0) + 1
+      if (user.phoneOtpAttempts >= 5) {
+        user.phoneOtpBlocked = true
+        await user.save()
+        return res.status(400).json({ message: 'Too many attempts. Try again later.' })
+      }
+      await user.save()
+      const remaining = 5 - user.phoneOtpAttempts
+      return res.status(400).json({ message: `Invalid OTP. ${remaining} attempts remaining.` })
     }
 
     // Mark verified and clear OTP
     user.isPhoneVerified = true
+    user.phoneOtpHash = undefined
     user.phoneOtp = undefined
     user.phoneOtpExpires = undefined
     user.phoneOtpSentAt = undefined
+    user.phoneOtpAttempts = 0
+    user.phoneOtpBlocked = false
     await user.save()
 
     const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' })
@@ -173,21 +223,27 @@ exports.resendOtp = async (req, res) => {
     if (user.isPhoneVerified) return res.status(400).json({ message: 'Phone already verified' })
 
     const now = Date.now()
-    const cooldownMs = 60 * 1000 // 60 seconds
+    const cooldownMs = 30 * 1000 // 30 seconds cooldown
     if (user.phoneOtpSentAt && now - new Date(user.phoneOtpSentAt).getTime() < cooldownMs) {
-      return res.status(429).json({ message: 'OTP recently sent. Please wait before requesting another.' })
+      return res.status(429).json({ message: 'Please wait before requesting a new OTP.' })
     }
 
     // Generate new OTP, update timestamps
     const otp = generateNumericOtp(6)
-    user.phoneOtp = otp
-    user.phoneOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+    const otpHash = await bcrypt.hash(otp, 10)
+    user.phoneOtpHash = otpHash
+    user.phoneOtpExpires = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
     user.phoneOtpSentAt = new Date()
+    user.phoneOtpAttempts = 0
+    user.phoneOtpBlocked = false
+    if (process.env.NODE_ENV === 'test') user.phoneOtp = otp
+    else user.phoneOtp = undefined
     await user.save()
 
-    console.log(`Resent OTP for ${phone}:`, otp) // TODO: integrate SMS provider
+    const sent = await smsService.sendSms(phone, `Your verification OTP is ${otp}. It will expire in 5 minutes.`)
+    if (!sent) return res.status(500).json({ message: 'SMS provider not configured' })
 
-    res.json({ success: true, message: 'OTP resent to phone' })
+    res.json({ success: true, message: 'OTP sent successfully to your mobile number.' })
   } catch (err) {
     console.error('Resend OTP error:', err)
     res.status(500).json({ message: 'Server error' })
@@ -198,4 +254,98 @@ exports.resendOtp = async (req, res) => {
 exports.logout = (req, res) => {
   // Server doesn't invalidate stateless JWTs; client should discard token
   res.json({ success: true, message: "Logged out" })
+}
+
+// ================= FORGOT PASSWORD =================
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { error } = validateForgotPassword(req.body)
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message })
+    }
+
+    const { email } = req.body
+
+    const user = await User.findOne({ email })
+    if (!user) {
+      // Security: don't reveal if email exists
+      return res.status(200).json({ success: true, message: "If an account with that email exists, password reset instructions have been sent." })
+    }
+
+    // Generate reset token (32 char hex string)
+    const resetToken = crypto.randomBytes(16).toString('hex')
+    const resetTokenHash = await bcrypt.hash(resetToken, 10)
+
+    // Store hashed token with 1 hour expiry
+    user.resetPasswordToken = resetTokenHash
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+    await user.save()
+
+    // Send reset email
+    const { sendPasswordResetEmail } = require('../services/emailService')
+    const emailSent = await sendPasswordResetEmail(
+      user.email,
+      user.name,
+      resetToken,
+      process.env.FRONTEND_URL || 'http://localhost:3000'
+    )
+
+    if (!emailSent && process.env.NODE_ENV === 'production') {
+      return res.status(500).json({ success: false, message: 'Failed to send reset email' })
+    }
+
+    res.status(200).json({ success: true, message: "If an account with that email exists, password reset instructions have been sent." })
+  } catch (err) {
+    console.error('Forgot password error:', err)
+    res.status(500).json({ success: false, message: 'Server error' })
+  }
+}
+
+// ================= RESET PASSWORD =================
+exports.resetPassword = async (req, res) => {
+  try {
+    const { error } = validateResetPassword(req.body)
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message })
+    }
+
+    const { token, password, confirmPassword } = req.body
+
+    // Verify passwords match (additional safeguard)
+    if (password !== confirmPassword) {
+      return res.status(400).json({ success: false, message: "Passwords do not match" })
+    }
+
+    // Find user with valid reset token
+    const users = await User.find()
+    let user = null
+    for (const u of users) {
+      if (u.resetPasswordToken && u.resetPasswordExpires && new Date() <= u.resetPasswordExpires) {
+        const match = await bcrypt.compare(token, u.resetPasswordToken)
+        if (match) {
+          user = u
+          break
+        }
+      }
+    }
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: "Reset token is invalid or has expired" })
+    }
+
+    // Update password
+    user.password = await bcrypt.hash(password, 10)
+    user.resetPasswordToken = undefined
+    user.resetPasswordExpires = undefined
+    await user.save()
+
+    // Send confirmation email
+    const { sendPasswordChangeConfirmation } = require('../services/emailService')
+    await sendPasswordChangeConfirmation(user.email, user.name)
+
+    res.status(200).json({ success: true, message: "Password has been reset successfully. You can now login with your new password." })
+  } catch (err) {
+    console.error('Reset password error:', err)
+    res.status(500).json({ success: false, message: 'Server error' })
+  }
 }

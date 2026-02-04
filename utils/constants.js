@@ -24,6 +24,7 @@ const NOTIFICATION_TYPES = {
   JOB_POSTED: "job_posted",
   JOB_ACCEPTED: "job_accepted",
   JOB_COMPLETED: "job_completed",
+  JOB_CLOSED: "job_closed",
   PAYMENT_RELEASED: "payment_released",
   REVIEW_RECEIVED: "review_received",
   APPLICATION_RECEIVED: "application_received",

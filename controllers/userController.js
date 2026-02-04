@@ -1,6 +1,7 @@
 const User = require("../models/User")
 const ResponseHelper = require("../utils/responseHelper")
 const { validateProfileUpdate } = require("../validators/userValidator")
+const { validateProfileCompletion } = require("../services/profileValidation")
 const cloudinary = require("../config/cloudinary")
 
 // @desc    Update user profile
@@ -44,6 +45,16 @@ const updateProfile = async (req, res) => {
 
     if (!updatedUser) {
       return ResponseHelper.error(res, "User not found", 404)
+    }
+
+    // Check if profile is now complete and update flag
+    const profileValidation = validateProfileCompletion(updatedUser)
+    if (profileValidation.isComplete && !updatedUser.isProfileComplete) {
+      updatedUser.isProfileComplete = true
+      await updatedUser.save()
+    } else if (!profileValidation.isComplete && updatedUser.isProfileComplete) {
+      updatedUser.isProfileComplete = false
+      await updatedUser.save()
     }
 
     ResponseHelper.success(res, updatedUser, "Profile updated successfully")
@@ -288,6 +299,28 @@ const getUserStats = async (req, res) => {
   }
 }
 
+// @desc    Get profile completion status
+// @route   GET /api/users/profile/completion-status
+// @access  Private
+const getProfileCompletionStatus = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+    if (!user) {
+      return ResponseHelper.error(res, "User not found", 404)
+    }
+
+    const profileValidation = validateProfileCompletion(user)
+    ResponseHelper.success(res, {
+      isProfileComplete: profileValidation.isComplete,
+      missingFields: profileValidation.missingFields,
+      role: user.role,
+    }, "Profile completion status retrieved successfully")
+  } catch (error) {
+    console.error("Get profile completion status error:", error)
+    ResponseHelper.error(res, "Server error", 500)
+  }
+}
+
 module.exports = {
   updateProfile,
   getUserById,
@@ -296,4 +329,5 @@ module.exports = {
   getEmployers,
   deactivateAccount,
   getUserStats,
+  getProfileCompletionStatus,
 }

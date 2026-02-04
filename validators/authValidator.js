@@ -16,6 +16,10 @@ const validateSignup = (data) => {
       "string.min": "Password must be at least 6 characters long",
       "any.required": "Password is required",
     }),
+    confirmPassword: Joi.string().valid(Joi.ref('password')).required().messages({
+      "any.only": "Passwords do not match",
+      "any.required": "Confirm password is required",
+    }),
     role: Joi.string()
       .valid(USER_ROLES.STUDENT, USER_ROLES.EMPLOYER)
       .required()
@@ -33,6 +37,23 @@ const validateSignup = (data) => {
     skills: Joi.when("role", {
       is: "student",
       then: Joi.array().items(Joi.string().trim()),
+      otherwise: Joi.forbidden(),
+    }),
+    location: Joi.when("role", {
+      is: "student",
+      then: Joi.object({
+        city: Joi.string().min(2).max(100).required().messages({
+          "any.required": "City is required for students",
+        }),
+        state: Joi.string().min(2).max(100).required().messages({
+          "any.required": "State is required for students",
+        }),
+        country: Joi.string().min(2).max(100).required().messages({
+          "any.required": "Country is required for students",
+        }),
+      }).required().messages({
+        "any.required": "Location (city, state, country) is required for students",
+      }),
       otherwise: Joi.forbidden(),
     }),
     businessName: Joi.when("role", {
@@ -76,7 +97,38 @@ const validateLogin = (data) => {
   return schema.validate(data)
 }
 
+const validateForgotPassword = (data) => {
+  const schema = Joi.object({
+    email: Joi.string().email().required().messages({
+      "string.email": "Please provide a valid email address",
+      "any.required": "Email is required",
+    }),
+  })
+
+  return schema.validate(data)
+}
+
+const validateResetPassword = (data) => {
+  const schema = Joi.object({
+    token: Joi.string().required().messages({
+      "any.required": "Reset token is required",
+    }),
+    password: Joi.string().min(6).required().messages({
+      "string.min": "Password must be at least 6 characters long",
+      "any.required": "Password is required",
+    }),
+    confirmPassword: Joi.string().valid(Joi.ref('password')).required().messages({
+      "any.only": "Passwords do not match",
+      "any.required": "Confirm password is required",
+    }),
+  })
+
+  return schema.validate(data)
+}
+
 module.exports = {
   validateSignup,
   validateLogin,
+  validateForgotPassword,
+  validateResetPassword,
 }

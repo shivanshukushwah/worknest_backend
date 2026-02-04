@@ -8,6 +8,7 @@ const {
   getEmployers,
   deactivateAccount,
   getUserStats,
+  getProfileCompletionStatus,
 } = require("../controllers/userController")
 const { auth, authorize } = require("../middleware/auth")
 
@@ -33,6 +34,7 @@ router.use(auth)
 
 // Profile management
 router.put("/profile", upload.single("avatar"), updateProfile)
+router.get("/profile/completion-status", getProfileCompletionStatus)
 router.get("/stats", getUserStats)
 router.delete("/deactivate", deactivateAccount)
 

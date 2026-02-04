@@ -80,6 +80,14 @@ if (require.main === module) {
     // Start background workers
     startShortlistScheduler()
 
+    // Start OTP cleanup worker to automatically invalidate expired OTPs
+    try {
+      const { startOtpCleanup } = require('./services/otpCleanup')
+      startOtpCleanup()
+    } catch (e) {
+      console.error('Failed to start OTP cleanup:', e)
+    }
+
     // Start inspection queue worker if enabled
     try {
       const { startInspectionQueue } = require('./services/inspectionQueue')

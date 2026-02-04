@@ -1,5 +1,7 @@
 const Job = require("../models/Job")
+const User = require("../models/User")
 const ResponseHelper = require("../utils/responseHelper")
+const { validateProfileCompletion, getMissingFieldsMessage } = require("../services/profileValidation")
 
 // @desc    Create a new job
 // @route   POST /api/jobs
@@ -8,15 +10,29 @@ const createJob = async (req, res) => {
   console.log("CREATE JOB body:", req.body) // debug
 
   try {
-    const { title, description, category, budget, duration, submissionRequiresFiles = false, jobType = "offline", positionsRequired = 1, shortlistMultiplier = 3, shortlistWindowHours = 3 } = req.body
+    const { title, description, category, budget, duration, submissionRequiresFiles = false, jobType = "offline", positionsRequired = 1, shortlistMultiplier = 3, shortlistWindowHours = 3, location } = req.body
 
     if (!title || !description || !category || !budget || !duration) {
       return res.status(400).json({ success: false, message: "Missing required fields - duration required" })
     }
 
+    // Offline jobs require location
+    if (jobType === 'offline' && !location) {
+      return res.status(400).json({ success: false, message: "Location (city, state) is required for offline jobs" })
+    }
+
     // ensure authenticated user available
     const employerId = req.user?.id
     if (!employerId) return res.status(401).json({ success: false, message: "Unauthorized" })
+
+    // Check profile completeness before allowing job creation
+    const employer = await User.findById(employerId)
+    if (!employer) return res.status(404).json({ success: false, message: "User not found" })
+    const profileValidation = validateProfileCompletion(employer)
+    if (!profileValidation.isComplete) {
+      const msg = getMissingFieldsMessage(profileValidation.missingFields)
+      return res.status(400).json({ success: false, message: msg })
+    }
 
     // coerce numeric fields and enforce sensible defaults
     const positionsRequiredNum = Math.max(1, parseInt(positionsRequired, 10) || 1)
@@ -27,7 +43,7 @@ const createJob = async (req, res) => {
       return res.status(400).json({ success: false, message: 'shortlistWindowHours must be at least 1 hour for online jobs' })
     }
 
-    const job = await Job.create({
+    const jobData = {
       title,
       description,
       category,
@@ -40,7 +56,22 @@ const createJob = async (req, res) => {
       positionsRequired: positionsRequiredNum,
       shortlistMultiplier,
       shortlistWindowHours: shortlistWindowHoursNum,
-    })
+    }
+    // Add location for offline jobs
+    if (jobType === 'offline' && location) {
+      jobData.location = {
+        city: location.city,
+        state: location.state,
+        country: location.country || 'India', // default to India
+      }
+    }
+
+    // Set shortlist window end time for online jobs
+    if (jobType === 'online') {
+      jobData.shortlistWindowEndsAt = new Date(Date.now() + shortlistWindowHoursNum * 60 * 60 * 1000)
+    }
+
+    const job = await Job.create(jobData)
 
     return res.status(201).json({ success: true, data: job })
   } catch (err) {
@@ -57,6 +88,17 @@ const getJobs = async (req, res) => {
     if (mine === "true" && req.user) query.employer = req.user.id
 
     const jobs = await Job.find(query).sort({ createdAt: -1 })
+
+    // Apply location-based filtering for students viewing all jobs
+    if (req.user && req.user.role === 'student' && mine !== "true") {
+      const student = await User.findById(req.user.id)
+      if (student && student.location) {
+        const { filterJobsByType } = require('../services/locationService')
+        const filteredJobs = filterJobsByType(jobs, student.location, 50) // 50km radius
+        return res.json(filteredJobs)
+      }
+    }
+
     return res.json(jobs)
   } catch (err) {
     console.error("Get jobs error:", err)
@@ -168,6 +210,15 @@ const applyForJob = async (req, res) => {
 
   try {
     if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
+
+    // Check profile completeness before allowing job application
+    const student = await User.findById(req.user.id)
+    if (!student) return res.status(404).json({ success: false, message: "User not found" })
+    const profileValidation = validateProfileCompletion(student)
+    if (!profileValidation.isComplete) {
+      const msg = getMissingFieldsMessage(profileValidation.missingFields)
+      return res.status(400).json({ success: false, message: msg })
+    }
 
     const job = await Job.findById(req.params.id)
     if (!job) return res.status(404).json({ success: false, message: "Job not found" })
