@@ -77,7 +77,48 @@ async function sendPasswordChangeConfirmation(userEmail, userName) {
   }
 }
 
+// Send OTP via email
+async function sendOtpEmail(userEmail, userName, otp) {
+  try {
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.warn('⚠️  Email service not configured. Development mode: OTP logged to console')
+      console.log(`\n🔐 DEVELOPMENT MODE - OTP for ${userEmail}: ${otp}\n`)
+      return true // Allow flow to continue in dev
+    }
+
+    const transporter = createTransporter()
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: userEmail,
+      subject: 'Your WorkNest Verification Code',
+      html: `
+        <h2>Verify Your Email</h2>
+        <p>Hi ${userName},</p>
+        <p>Your WorkNest verification code is:</p>
+        <p style="font-size: 32px; font-weight: bold; color: #007bff; letter-spacing: 5px; margin: 20px 0;">${otp}</p>
+        <p>This code will expire in <strong>10 minutes</strong>.</p>
+        <p>If you did not request this code, please ignore this email.</p>
+        <p>Best regards,<br/>WorkNest Team</p>
+      `,
+    }
+
+    await transporter.sendMail(mailOptions)
+    console.log(`✅ OTP email sent to ${userEmail}`)
+    return true
+  } catch (error) {
+    console.error('❌ Error sending OTP email:', error.message)
+    // In development, show OTP in console as fallback
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`\n⚠️  Email failed. Development fallback - OTP for ${userEmail}: ${otp}\n`)
+      return true
+    }
+    return false
+  }
+}
+
 module.exports = {
   sendPasswordResetEmail,
   sendPasswordChangeConfirmation,
+  sendOtpEmail,
 }
