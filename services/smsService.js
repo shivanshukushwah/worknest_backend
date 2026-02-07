@@ -1,26 +1,38 @@
 const axios = require('axios')
 
-// Simple SMS service with Twilio support. Returns true when a message was sent
+// Simple SMS service with Fast2SMS support. Returns true when a message was sent
 // Returns true in test env (no-op). Returns false when provider not configured.
 
-const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID
-const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN
-const TWILIO_FROM = process.env.TWILIO_FROM
+const FAST2SMS_API_KEY = process.env.FAST2SMS_API_KEY
 
 async function sendSms(to, body) {
   // Ensure phone is provided
   if (!to || !body) return false
 
-  // In tests, do nothing and allow assertions that rely on DB phoneOtp
-  if (process.env.NODE_ENV === 'test') return true
+  // In tests or development, do nothing and allow assertions that rely on DB phoneOtp
+  if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') return true
 
-  if (TWILIO_SID && TWILIO_TOKEN && TWILIO_FROM) {
+  if (FAST2SMS_API_KEY) {
     try {
-      const client = require('twilio')(TWILIO_SID, TWILIO_TOKEN)
-      await client.messages.create({ body, from: TWILIO_FROM, to })
+      // Format phone number - remove + and any spaces
+      const formattedPhone = to.replace(/\+/g, '').replace(/\s/g, '')
+      
+      // Use query string format for Fast2SMS API
+      const queryParams = new URLSearchParams({
+        authorization: FAST2SMS_API_KEY,
+        message: body,
+        numbers: formattedPhone,
+      }).toString()
+
+      const response = await axios.get(
+        `https://www.fast2sms.com/dev/bulkV2?${queryParams}`
+      )
+      
+      console.log('✅ SMS sent successfully via Fast2SMS')
       return true
     } catch (err) {
-      console.error('Twilio send error:', err.message)
+      const errorMsg = err.response?.data?.message || err.response?.data || err.message
+      console.error('❌ Fast2SMS send error:', errorMsg)
       return false
     }
   }
