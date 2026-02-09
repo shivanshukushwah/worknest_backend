@@ -32,16 +32,9 @@ async function sendPasswordResetEmail(userEmail, userName, resetToken, frontendU
 // Send password change confirmation email
 async function sendPasswordChangeConfirmation(userEmail, userName) {
   try {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.warn('Email service not configured. Password changed for:', userEmail)
-      return true
-    }
-
-    const transporter = createTransporter()
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    const msg = {
       to: userEmail,
+      from: process.env.EMAIL_FROM,
       subject: 'Password Changed Successfully',
       html: `
         <h2>Password Changed</h2>
@@ -52,7 +45,7 @@ async function sendPasswordChangeConfirmation(userEmail, userName) {
       `,
     }
 
-    await transporter.sendMail(mailOptions)
+    await sgMail.send(msg)
     return true
   } catch (error) {
     console.error('Error sending password change confirmation:', error.message)
@@ -63,17 +56,9 @@ async function sendPasswordChangeConfirmation(userEmail, userName) {
 // Send OTP via email
 async function sendOtpEmail(userEmail, userName, otp) {
   try {
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.warn('⚠️  Email service not configured. Development mode: OTP logged to console')
-      console.log(`\n🔐 DEVELOPMENT MODE - OTP for ${userEmail}: ${otp}\n`)
-      return true // Allow flow to continue in dev
-    }
-
-    const transporter = createTransporter()
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    const msg = {
       to: userEmail,
+      from: process.env.EMAIL_FROM,
       subject: 'Your WorkNest Verification Code',
       html: `
         <h2>Verify Your Email</h2>
@@ -86,7 +71,7 @@ async function sendOtpEmail(userEmail, userName, otp) {
       `,
     }
 
-    await transporter.sendMail(mailOptions)
+    await sgMail.send(msg)
     console.log(`✅ OTP email sent to ${userEmail}`)
     return true
   } catch (error) {
@@ -100,7 +85,7 @@ async function sendOtpEmail(userEmail, userName, otp) {
   }
 }
 
-module.exports = {
+export {
   sendPasswordResetEmail,
   sendPasswordChangeConfirmation,
   sendOtpEmail,
