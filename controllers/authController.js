@@ -157,12 +157,13 @@ exports.login = async (req, res) => {
 }
 
 // Verify email OTP and issue token
+// Accepts either { email, otp } or { userId, otp } so frontend can pass userId and only OTP input is needed
 exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body
-    if (!email || !otp) return res.status(400).json({ message: 'Email and OTP are required' })
+    const { email, otp, userId } = req.body
+    if ((!email && !userId) || !otp) return res.status(400).json({ message: 'Identifier (email or userId) and OTP are required' })
 
-    const user = await User.findOne({ email })
+    const user = userId ? await User.findById(userId) : await User.findOne({ email })
     if (!user) return res.status(404).json({ message: 'User not found' })
 
     // Check if OTP exists and hasn't expired
@@ -190,7 +191,7 @@ exports.verifyOtp = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: 'Email verified successfully',
+      message: 'Verified successfully',
       token, 
       user: { 
         id: user._id, 
@@ -209,13 +210,13 @@ exports.verifyOtp = async (req, res) => {
 // Resend OTP (with cooldown)
 exports.resendOtp = async (req, res) => {
   try {
-    const { email } = req.body
-    if (!email) return res.status(400).json({ message: 'Email is required' })
+    const { email, userId } = req.body
+    if (!email && !userId) return res.status(400).json({ message: 'Identifier (email or userId) is required' })
 
-    const user = await User.findOne({ email })
+    const user = userId ? await User.findById(userId) : await User.findOne({ email })
     if (!user) return res.status(404).json({ message: 'User not found' })
 
-    if (user.isPhoneVerified) return res.status(400).json({ message: 'Email already verified' })
+    if (user.isPhoneVerified) return res.status(400).json({ message: 'Account already verified' })
 
     // 60 second cooldown between OTP requests
     const now = Date.now()
@@ -228,8 +229,9 @@ exports.resendOtp = async (req, res) => {
     // Generate new OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
     
-    // Send OTP via email
-    const emailSent = await emailService.sendOtpEmail(email, user.name, otp)
+    // Use user's email for sending
+    const targetEmail = user.email
+    const emailSent = await emailService.sendOtpEmail(targetEmail, user.name, otp)
     
     if (!emailSent) {
       return res.status(500).json({ message: 'Failed to send OTP email' })
@@ -243,7 +245,8 @@ exports.resendOtp = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: 'OTP sent successfully to your email.' 
+      message: 'OTP sent successfully to your email.' ,
+      userId: user._id
     })
   } catch (err) {
     console.error('Resend OTP error:', err)
