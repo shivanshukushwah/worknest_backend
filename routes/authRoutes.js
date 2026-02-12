@@ -8,6 +8,9 @@ router.post("/register", authController.register)
 // Login route
 router.post("/login", authController.login)
 
+// Get all accounts for an email (student/employer accounts)
+router.post("/accounts-for-email", authController.getAccountsForEmail)
+
 // Verify OTP to complete registration
 router.post("/verify-otp", authController.verifyOtp)
 

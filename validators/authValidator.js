@@ -92,6 +92,13 @@ const validateLogin = (data) => {
     password: Joi.string().required().messages({
       "any.required": "Password is required",
     }),
+    role: Joi.string()
+      .valid(USER_ROLES.STUDENT, USER_ROLES.EMPLOYER)
+      .required()
+      .messages({
+        "any.only": "Role must be either 'student' or 'employer'",
+        "any.required": "Role is required for login",
+      }),
   })
 
   return schema.validate(data)

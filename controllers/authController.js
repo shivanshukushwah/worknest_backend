@@ -34,9 +34,10 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Passwords do not match" })
     }
 
-    const existingEmail = await User.findOne({ email })
-    if (existingEmail) {
-      return res.status(409).json({ message: "Email already registered" })
+    // Check if user already has this role with same email
+    const existingUser = await User.findOne({ email, role })
+    if (existingUser) {
+      return res.status(409).json({ message: `You already have a ${role} account with this email` })
     }
 
     const existingPhone = await User.findOne({ phone })
@@ -111,15 +112,20 @@ exports.register = async (req, res) => {
 // ================= LOGIN =================
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body
+    const { email, password, role } = req.body
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password required" })
     }
 
-    const user = await User.findOne({ email })
+    if (!role) {
+      return res.status(400).json({ message: "Role (student/employer) is required" })
+    }
+
+    // Find user by email AND role (since same email can have multiple accounts)
+    const user = await User.findOne({ email, role })
     if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" })
+      return res.status(401).json({ message: "Invalid credentials or account not found" })
     }
 
     const match = await bcrypt.compare(password, user.password)
@@ -353,3 +359,31 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' })
   }
 }
+// ================= GET ACCOUNTS FOR EMAIL =================
+// List all accounts (student/employer) for a given email
+exports.getAccountsForEmail = async (req, res) => {
+  try {
+    const { email } = req.body
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" })
+    }
+
+    const accounts = await User.find({ email })
+      .select('_id email role name businessName isProfileComplete')
+      .exec()
+
+    if (accounts.length === 0) {
+      return res.status(404).json({ message: "No accounts found for this email" })
+    }
+
+    res.json({
+      success: true,
+      message: `Found ${accounts.length} account(s) for this email`,
+      email,
+      accounts,
+    })
+  } catch (err) {
+    console.error("Get accounts error:", err)
+    res.status(500).json({ message: "Server error" })
+  }

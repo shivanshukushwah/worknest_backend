@@ -3,7 +3,7 @@ const mongoose = require("mongoose")
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["student", "employer", "admin"], required: true },
     phone: { type: String, unique: true, sparse: true },
@@ -68,5 +68,8 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 )
+
+// Unique compound index: same email can have different roles (student, employer)
+userSchema.index({ email: 1, role: 1 }, { unique: true })
 
 module.exports = mongoose.model("User", userSchema)
