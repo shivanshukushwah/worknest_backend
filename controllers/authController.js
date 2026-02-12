@@ -40,11 +40,6 @@ exports.register = async (req, res) => {
       return res.status(409).json({ message: `You already have a ${role} account with this email` })
     }
 
-    const existingPhone = await User.findOne({ phone })
-    if (existingPhone) {
-      return res.status(409).json({ message: "Phone number already registered" })
-    }
-
     const hashedPassword = await bcrypt.hash(password, 10)
 
     // Create user but do not issue token until phone verified

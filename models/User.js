@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["student", "employer", "admin"], required: true },
-    phone: { type: String, unique: true, sparse: true },
+    phone: { type: String, sparse: true },
     isPhoneVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     isProfileComplete: { type: Boolean, default: false },
@@ -69,7 +69,11 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
-// Unique compound index: same email can have different roles (student, employer)
+// Unique compound indexes
+// Same email can have different roles (student, employer)
 userSchema.index({ email: 1, role: 1 }, { unique: true })
+
+// Same phone can have different roles (student, employer) but not duplicate within same role
+userSchema.index({ phone: 1, role: 1 }, { unique: true, sparse: true })
 
 module.exports = mongoose.model("User", userSchema)
