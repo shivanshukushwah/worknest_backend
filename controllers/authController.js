@@ -387,3 +387,4 @@ exports.getAccountsForEmail = async (req, res) => {
     console.error("Get accounts error:", err)
     res.status(500).json({ message: "Server error" })
   }
+}
