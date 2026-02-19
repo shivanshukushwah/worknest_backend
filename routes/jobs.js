@@ -7,6 +7,7 @@ const {
   acceptApplication,
   submitWork,
   getMyJobs,
+  getMyApplications,
   cancelJob,
 } = require("../controllers/jobController")
 const { auth, authorize } = require("../middleware/auth")
@@ -20,6 +21,7 @@ router.use(auth)
 router.post("/", authorize("employer"), createJob)
 router.get("/", getJobs)
 router.get("/my-jobs", getMyJobs)
+router.get("/my-applications", authorize("student"), getMyApplications)
 router.get("/:id", getJobById)
 
 // Shortlisted candidates for a job (employer or admin)

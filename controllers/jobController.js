@@ -772,12 +772,62 @@ const cancelJob = async (req, res) => {
   return res.status(501).json({ success: false, message: "Not implemented" })
 }
 
+// @desc    Get all applications by current student
+// @route   GET /api/jobs/my-applications
+// @access  Private (Student only)
+const getMyApplications = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
+    if (req.user.role !== 'student') return res.status(403).json({ success: false, message: "Only students can view their applications" })
+
+    // Find all jobs where this student has applied
+    const jobs = await Job.find({ "applications.student": req.user.id }).populate('employer', 'name businessName').lean()
+
+    // Extract application details for each job
+    const myApplications = jobs.map(job => {
+      const application = job.applications.find(a => String(a.student) === String(req.user.id))
+      if (!application) return null
+
+      return {
+        applicationId: application._id,
+        jobId: job._id,
+        jobTitle: job.title,
+        jobDescription: job.description,
+        jobCategory: job.category,
+        jobType: job.jobType || 'offline',
+        budget: job.budget,
+        duration: job.duration,
+        location: job.location || null,
+        employer: job.employer,
+        coverLetter: application.coverLetter || '',
+        proposedBudget: application.proposedBudget || null,
+        status: application.status,
+        shortlisted: application.shortlisted || false,
+        evaluationScore: application.evaluationScore || 0,
+        profileUrl: application.profileUrl || null,
+        appliedAt: application.createdAt,
+        jobStatus: job.status,
+        jobCreatedAt: job.createdAt,
+      }
+    }).filter(a => a !== null)
+
+    // Sort by application date (newest first)
+    myApplications.sort((a, b) => new Date(b.appliedAt) - new Date(a.appliedAt))
+
+    return res.json({ success: true, applications: myApplications })
+  } catch (err) {
+    console.error('Get my applications error:', err)
+    return res.status(500).json({ success: false, message: 'Server error' })
+  }
+}
+
 module.exports = {
   createJob,
   getJobs,
   getJobById,
   getShortlistedCandidates,
   getMyJobs,
+  getMyApplications,
   getJobSubmission,
   applyForJob,
   acceptApplication,
