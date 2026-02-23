@@ -6,6 +6,8 @@ const validateProfileUpdate = (data, userRole) => {
     phone: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/),
     bio: Joi.string().max(300),
     avatar: Joi.string().uri(),
+    age: Joi.number().integer().min(13).max(100),
+    userType: Joi.string().valid("student", "worker"), // Allow userType to be updated during profile completion
   }
 
   // Add role-specific validation
@@ -19,6 +21,15 @@ const validateProfileUpdate = (data, userRole) => {
         .integer()
         .min(1950)
         .max(new Date().getFullYear() + 10),
+    })
+    baseSchema.location = Joi.object({
+      city: Joi.string().max(100),
+      state: Joi.string().max(100),
+      country: Joi.string().max(100),
+      coordinates: Joi.object({
+        latitude: Joi.number().min(-90).max(90),
+        longitude: Joi.number().min(-180).max(180),
+      }),
     })
   }
 

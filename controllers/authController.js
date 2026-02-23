@@ -69,8 +69,9 @@ exports.register = async (req, res) => {
       if (businessCity) userData.businessAddress.city = businessCity
     }
 
-    // Set initial score for new students
+    // Set userType to "worker" by default for role === 'student'
     if (role === 'student') {
+      userData.userType = 'worker'  // Default to worker instead of student
       const { SCORE_EVENTS } = require('../utils/constants')
       userData.score = SCORE_EVENTS.NEW_STUDENT || 0
     }
