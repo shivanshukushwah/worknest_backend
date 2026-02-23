@@ -1,7 +1,7 @@
-// Profile validation service to check if a user's profile is complete based on their role
+// Profile validation service to check if a user's profile is complete based on their role and type
 
 /**
- * Check if a user's profile is complete based on their role.
+ * Check if a user's profile is complete based on their role and userType.
  * Returns { isComplete: boolean, missingFields: string[] }
  */
 function validateProfileCompletion(user) {
@@ -14,15 +14,24 @@ function validateProfileCompletion(user) {
 
   // Role-specific requirements
   if (user.role === 'student') {
-    if (!user.skills || !Array.isArray(user.skills) || user.skills.length === 0) {
-      missing.push('skills')
-    }
-    if (!user.education || !user.education.institution || !user.education.degree) {
-      missing.push('education')
+    // Both student and worker types need age and location
+    if (!user.age || user.age <= 0) {
+      missing.push('age')
     }
     if (!user.location || !user.location.city || !user.location.state || !user.location.country) {
       missing.push('location')
     }
+
+    // Student type specific requirements
+    if (user.userType === 'student') {
+      if (!user.skills || !Array.isArray(user.skills) || user.skills.length === 0) {
+        missing.push('skills')
+      }
+      if (!user.education || !user.education.institution || !user.education.degree) {
+        missing.push('education')
+      }
+    }
+    // Worker type: only age and location needed (already checked above)
   }
 
   if (user.role === 'employer') {
@@ -49,6 +58,7 @@ function getMissingFieldsMessage(missingFields) {
     skills: 'Skills',
     education: 'Education details',
     location: 'Location (city, state, country)',
+    age: 'Age',
     businessName: 'Business name',
     businessLocation: 'Business location',
   }

@@ -38,7 +38,13 @@ const userSchema = new mongoose.Schema(
     avatar: String,
     profilePicture: String,
     
-    // Location field (for students)
+    // Student type: "student" or "worker" (only for role === "student")
+    userType: { type: String, enum: ["student", "worker"], default: "student" },
+    
+    // Age (required for both student and worker)
+    age: Number,
+    
+    // Location field (for students and workers)
     location: {
       city: String,
       state: String,
