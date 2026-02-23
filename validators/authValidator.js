@@ -21,10 +21,10 @@ const validateSignup = (data) => {
       "any.required": "Confirm password is required",
     }),
     role: Joi.string()
-      .valid(USER_ROLES.STUDENT, USER_ROLES.EMPLOYER)
+      .valid(USER_ROLES.STUDENT, USER_ROLES.WORKER, USER_ROLES.EMPLOYER)
       .required()
       .messages({
-        "any.only": "Role must be either 'student' or 'employer'",
+        "any.only": "Role must be one of 'student', 'worker' or 'employer'",
         "any.required": "Role is required",
       }),
     phone: Joi.string()
@@ -35,24 +35,24 @@ const validateSignup = (data) => {
         "any.required": "Phone number is required",
       }),
     skills: Joi.when("role", {
-      is: "student",
+      is: Joi.valid(USER_ROLES.STUDENT, USER_ROLES.WORKER),
       then: Joi.array().items(Joi.string().trim()),
       otherwise: Joi.forbidden(),
     }),
     location: Joi.when("role", {
-      is: "student",
+      is: Joi.valid(USER_ROLES.STUDENT, USER_ROLES.WORKER),
       then: Joi.object({
         city: Joi.string().min(2).max(100).required().messages({
-          "any.required": "City is required for students",
+          "any.required": "City is required for students/workers",
         }),
         state: Joi.string().min(2).max(100).required().messages({
-          "any.required": "State is required for students",
+          "any.required": "State is required for students/workers",
         }),
         country: Joi.string().min(2).max(100).required().messages({
-          "any.required": "Country is required for students",
+          "any.required": "Country is required for students/workers",
         }),
       }).required().messages({
-        "any.required": "Location (city, state, country) is required for students",
+        "any.required": "Location (city, state, country) is required for students/workers",
       }),
       otherwise: Joi.forbidden(),
     }),
@@ -93,10 +93,10 @@ const validateLogin = (data) => {
       "any.required": "Password is required",
     }),
     role: Joi.string()
-      .valid(USER_ROLES.STUDENT, USER_ROLES.EMPLOYER)
+      .valid(USER_ROLES.STUDENT, USER_ROLES.WORKER, USER_ROLES.EMPLOYER)
       .required()
       .messages({
-        "any.only": "Role must be either 'student' or 'employer'",
+        "any.only": "Role must be one of 'student', 'worker' or 'employer'",
         "any.required": "Role is required for login",
       }),
   })

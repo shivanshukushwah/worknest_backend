@@ -89,8 +89,8 @@ const getJobs = async (req, res) => {
 
     const jobs = await Job.find(query).sort({ createdAt: -1 })
 
-    // Apply location-based filtering for students viewing all jobs
-    if (req.user && req.user.role === 'student' && mine !== "true") {
+    // Apply location-based filtering for workers viewing all jobs
+    if (req.user && (req.user.role === 'worker' || req.user.role === 'student') && mine !== "true") {
       const student = await User.findById(req.user.id)
       if (student && student.location) {
         const { filterJobsByType } = require('../services/locationService')
@@ -778,7 +778,7 @@ const cancelJob = async (req, res) => {
 const getMyApplications = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
-    if (req.user.role !== 'student') return res.status(403).json({ success: false, message: "Only students can view their applications" })
+    if (req.user.role !== 'worker' && req.user.role !== 'student') return res.status(403).json({ success: false, message: "Only workers can view their applications" })
 
     // Find all jobs where this student has applied
     const jobs = await Job.find({ "applications.student": req.user.id }).populate('employer', 'name businessName').lean()

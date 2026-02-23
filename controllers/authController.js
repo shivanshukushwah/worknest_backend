@@ -27,7 +27,7 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: error.details[0].message })
     }
 
-    const { name, email, password, confirmPassword, role, phone, location, businessName, businessType, businessLocation, businessCity } = req.body
+    const { name, email, password, confirmPassword, role, phone, location, businessName, businessType, businessLocation, businessCity, age, skills, education, userType } = req.body
 
     // Verify passwords match (additional safeguard, though Joi should catch this)
     if (password !== confirmPassword) {
@@ -38,6 +38,13 @@ exports.register = async (req, res) => {
     const existingUser = await User.findOne({ email, role })
     if (existingUser) {
       return res.status(409).json({ message: `You already have a ${role} account with this email` })
+    }
+    // Also ensure phone isn't already registered with the same role
+    if (phone) {
+      const existingPhoneUser = await User.findOne({ phone, role })
+      if (existingPhoneUser) {
+        return res.status(409).json({ message: `This phone number is already registered as a ${role}` })
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10)
@@ -52,12 +59,20 @@ exports.register = async (req, res) => {
       isPhoneVerified: false,
     }
 
-    if (role === 'student' && location) {
+    if ((role === 'student' || role === 'worker') && location) {
       userData.location = {
         city: location.city,
         state: location.state,
         country: location.country,
       }
+    }
+
+    // Accept additional profile fields at signup for students/workers
+    if (role === 'student' || role === 'worker') {
+      if (typeof age !== 'undefined') userData.age = age
+      if (skills) userData.skills = Array.isArray(skills) ? skills : [skills]
+      if (education) userData.education = education
+      if (userType) userData.userType = userType
     }
 
     if (role === 'employer') {
@@ -69,9 +84,12 @@ exports.register = async (req, res) => {
       if (businessCity) userData.businessAddress.city = businessCity
     }
 
-    // Set userType to "worker" by default for role === 'student'
-    if (role === 'student') {
-      userData.userType = 'worker'  // Default to worker instead of student
+    // Default userType based on role if client did not provide one.
+    // - role 'student' => userType 'student'
+    // - role 'worker'  => userType 'worker'
+    // Initialize score for both student/worker same as previous student flow.
+    if (role === 'worker' || role === 'student') {
+      if (!userData.userType) userData.userType = role === 'worker' ? 'worker' : 'student'
       const { SCORE_EVENTS } = require('../utils/constants')
       userData.score = SCORE_EVENTS.NEW_STUDENT || 0
     }
@@ -187,6 +205,22 @@ exports.verifyOtp = async (req, res) => {
     user.phoneOtp = null
     user.phoneOtpExpires = null
     await user.save()
+
+    // After verification, attempt to auto-create wallet if profile is complete
+    try {
+      const Wallet = require('../models/Wallet')
+      const { validateProfileCompletion } = require('../services/profileValidation')
+      const profileValidation = validateProfileCompletion(user)
+      if (profileValidation.isComplete) {
+        const existingWallet = await Wallet.findOne({ user: user._id })
+        if (!existingWallet) {
+          await Wallet.create({ user: user._id })
+        }
+      }
+    } catch (e) {
+      console.error('Auto-create wallet after verification failed:', e)
+      // do not block verification on wallet errors
+    }
 
     // Issue JWT token
     const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' })

@@ -13,7 +13,7 @@ function validateProfileCompletion(user) {
   }
 
   // Role-specific requirements
-  if (user.role === 'student') {
+  if (user.role === 'student' || user.role === 'worker') {
     // Both student and worker types need age and location
     if (!user.age || user.age <= 0) {
       missing.push('age')

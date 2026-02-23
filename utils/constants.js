@@ -9,6 +9,7 @@ const JOB_STATUS = {
 
 const USER_ROLES = {
   STUDENT: "student",
+  WORKER: "worker",
   EMPLOYER: "employer",
   ADMIN: "admin",
 }

@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, required: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ["student", "employer", "admin"], required: true },
+    role: { type: String, enum: ["student", "worker", "employer", "admin"], required: true },
     phone: { type: String, sparse: true },
     isPhoneVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
@@ -66,7 +66,7 @@ const userSchema = new mongoose.Schema(
       year: Number,
     },
     lastLogin: Date,
-    score: { type: Number, default: function() { return this.role === 'student' ? 35 : 0 } },
+    score: { type: Number, default: function() { return (this.role === 'student' || this.role === 'worker') ? 35 : 0 } },
 
     // Password reset fields
     resetPasswordToken: String,

@@ -11,7 +11,7 @@ const validateProfileUpdate = (data, userRole) => {
   }
 
   // Add role-specific validation
-  if (userRole === "student") {
+  if (userRole === "student" || userRole === "worker") {
     baseSchema.skills = Joi.array().items(Joi.string().trim().max(50))
     baseSchema.experience = Joi.string().valid("beginner", "intermediate", "advanced")
     baseSchema.education = Joi.object({
