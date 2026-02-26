@@ -181,9 +181,17 @@ exports.login = async (req, res) => {
 exports.verifyOtp = async (req, res) => {
   try {
     const { email, otp, userId } = req.body
-    if ((!email && !userId) || !otp) return res.status(400).json({ message: 'Identifier (email or userId) and OTP are required' })
+    if (!otp) return res.status(400).json({ message: 'OTP is required' })
 
-    const user = userId ? await User.findById(userId) : await User.findOne({ email })
+    let user
+    if (userId) {
+      user = await User.findById(userId)
+    } else if (email) {
+      user = await User.findOne({ email })
+    } else {
+      // no identifier provided; try to locate by OTP
+      user = await User.findOne({ phoneOtp: otp })
+    }
     if (!user) return res.status(404).json({ message: 'User not found' })
 
     // Check if OTP exists and hasn't expired
