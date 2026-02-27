@@ -42,7 +42,21 @@ const userSchema = new mongoose.Schema(
     userType: { type: String, enum: ["student", "worker"], default: "student" },
     
     // Age (required for both student and worker)
-    age: Number,
+    age: {
+      type: Number,
+      min: 13,
+      max: 100,
+      validate: {
+        validator: function (v) {
+          // require age when role is student or worker
+          if (this.role === 'student' || this.role === 'worker') {
+            return v != null
+          }
+          return true
+        },
+        message: 'Age is required for students/workers',
+      },
+    },
     
     // Location field (for students and workers)
     location: {

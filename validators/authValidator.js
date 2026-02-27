@@ -34,6 +34,23 @@ const validateSignup = (data) => {
         "string.pattern.base": "Please provide a valid phone number",
         "any.required": "Phone number is required",
       }),
+    // students/workers must supply age at signup
+    age: Joi.when("role", {
+      is: Joi.valid(USER_ROLES.STUDENT, USER_ROLES.WORKER),
+      then: Joi.number()
+        .integer()
+        .min(13)
+        .max(100)
+        .required()
+        .messages({
+          "number.base": "Age must be a number",
+          "number.integer": "Age must be an integer",
+          "number.min": "Age must be at least 13",
+          "number.max": "Age cannot exceed 100",
+          "any.required": "Age is required for students/workers",
+        }),
+      otherwise: Joi.forbidden(),
+    }),
     skills: Joi.when("role", {
       is: Joi.valid(USER_ROLES.STUDENT, USER_ROLES.WORKER),
       then: Joi.array().items(Joi.string().trim()),

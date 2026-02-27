@@ -30,6 +30,38 @@ beforeEach(async () => {
   await Wallet.deleteMany({})
 })
 
+describe('Register endpoint', () => {
+  test('should reject student signup without age', async () => {
+    const payload = {
+      name: 'Test Student',
+      email: 'stu@example.com',
+      password: 'password',
+      confirmPassword: 'password',
+      role: 'student',
+      phone: '+911234567891',
+      location: { city: 'City', state: 'ST', country: 'Country' }
+    }
+    const res = await request(app).post('/api/auth/register').send(payload).expect(400)
+    expect(res.body.message).toMatch(/Age is required/i)
+  })
+
+  test('should succeed when student provides age', async () => {
+    const payload = {
+      name: 'Test Student',
+      email: 'stu2@example.com',
+      password: 'password',
+      confirmPassword: 'password',
+      role: 'student',
+      phone: '+911234567892',
+      age: 20,
+      location: { city: 'City', state: 'ST', country: 'Country' }
+    }
+    const res = await request(app).post('/api/auth/register').send(payload).expect(201)
+    expect(res.body.success).toBe(true)
+    expect(res.body.userId).toBeDefined()
+  })
+})
+
 describe('Resend OTP endpoint', () => {
   test('should resend OTP and set phoneOtp and phoneOtpSentAt', async () => {
     const hashed = await bcrypt.hash('password', 10)
