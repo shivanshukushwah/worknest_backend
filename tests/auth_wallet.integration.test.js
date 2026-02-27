@@ -78,6 +78,64 @@ describe('Register endpoint', () => {
   })
 })
 
+describe('OTP verification and login responses', () => {
+  test('verifyOtp returns full profile and sets isProfileComplete', async () => {
+    const hashed = await bcrypt.hash('password', 10)
+    // create a user with all student fields but not verified yet
+    const user = await User.create({
+      name: 'Complete Student',
+      email: 'complete@example.com',
+      password: hashed,
+      phone: '+911234500000',
+      role: 'student',
+      age: 22,
+      education: 'BSc Physics',
+      skills: ['math'],
+      location: { city: 'City', state: 'ST', country: 'Country' },
+      phoneOtp: '123456',
+      phoneOtpExpires: new Date(Date.now() + 10 * 60 * 1000),
+      isPhoneVerified: false,
+    })
+
+    const res = await request(app)
+      .post('/api/auth/verify-otp')
+      .send({ userId: user._id, otp: '123456' })
+      .expect(200)
+
+    expect(res.body.success).toBe(true)
+    expect(res.body.user).toBeDefined()
+    expect(res.body.user.age).toBe(22)
+    expect(res.body.user.education).toBe('BSc Physics')
+    expect(res.body.user.isProfileComplete).toBe(true)
+    expect(res.body.user.isPhoneVerified).toBe(true)
+  })
+
+  test('login returns full user object', async () => {
+    const hashed = await bcrypt.hash('password', 10)
+    const user = await User.create({
+      name: 'Login User',
+      email: 'login@example.com',
+      password: hashed,
+      phone: '+911234500001',
+      role: 'student',
+      age: 25,
+      education: 'MBA',
+      skills: ['business'],
+      location: { city: 'City', state: 'ST', country: 'Country' },
+      isPhoneVerified: true,
+    })
+
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: user.email, password: 'password', role: 'student' })
+      .expect(200)
+
+    expect(res.body.success).toBe(true)
+    expect(res.body.user).toHaveProperty('education', 'MBA')
+    expect(res.body.user).toHaveProperty('location')
+  })
+})
+
 describe('Resend OTP endpoint', () => {
   test('should resend OTP and set phoneOtp and phoneOtpSentAt', async () => {
     const hashed = await bcrypt.hash('password', 10)

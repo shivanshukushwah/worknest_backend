@@ -160,15 +160,20 @@ exports.login = async (req, res) => {
       { expiresIn: "7d" }
     )
 
+    // prepare full user data for response
+    const userObj = user.toObject()
+    delete userObj.password
+    delete userObj.phoneOtp
+    delete userObj.phoneOtpHash
+    delete userObj.phoneOtpExpires
+    delete userObj.phoneOtpSentAt
+    delete userObj.phoneOtpAttempts
+    delete userObj.phoneOtpBlocked
+
     res.json({
       success: true,
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      user: userObj,
     })
   } catch (err) {
     console.error("Login error:", err)
@@ -212,6 +217,18 @@ exports.verifyOtp = async (req, res) => {
     user.isPhoneVerified = true
     user.phoneOtp = null
     user.phoneOtpExpires = null
+
+    // Determine profile completeness and update flag if needed
+    try {
+      const { validateProfileCompletion } = require('../services/profileValidation')
+      const profileValidation = validateProfileCompletion(user)
+      if (profileValidation.isComplete && !user.isProfileComplete) {
+        user.isProfileComplete = true
+      }
+    } catch (e) {
+      console.error('Profile validation during verifyOtp failed:', e)
+    }
+
     await user.save()
 
     // After verification, attempt to auto-create wallet if profile is complete
@@ -233,17 +250,21 @@ exports.verifyOtp = async (req, res) => {
     // Issue JWT token
     const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: '7d' })
 
+    // Return full user object (omit sensitive fields)
+    const userObj = user.toObject()
+    delete userObj.password
+    delete userObj.phoneOtp
+    delete userObj.phoneOtpHash
+    delete userObj.phoneOtpExpires
+    delete userObj.phoneOtpSentAt
+    delete userObj.phoneOtpAttempts
+    delete userObj.phoneOtpBlocked
+
     res.json({ 
       success: true, 
       message: 'Verified successfully',
       token, 
-      user: { 
-        id: user._id, 
-        name: user.name, 
-        email: user.email, 
-        role: user.role,
-        isPhoneVerified: true
-      } 
+      user: userObj,
     })
   } catch (err) {
     console.error('Verify OTP error:', err)
