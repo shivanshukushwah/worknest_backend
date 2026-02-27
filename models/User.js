@@ -74,28 +74,19 @@ const userSchema = new mongoose.Schema(
       average: { type: Number, default: 0 },
       count: { type: Number, default: 0 },
     },
+    // Education - initially stored as string during registration
+    // Later can be extended to object with institution, degree, year
     education: {
-      institution: {
-        type: String,
-        validate: {
-          validator: function(v) {
-            if (this.role === 'student' || this.role === 'worker') return v && v.trim() !== '';
-            return true;
-          },
-          message: 'Education institution is required for students/workers',
+      type: String,
+      validate: {
+        validator: function(v) {
+          if (this.role === 'student' || this.role === 'worker') {
+            return v && v.trim() !== '';
+          }
+          return true;
         },
+        message: 'Education is required for students/workers',
       },
-      degree: {
-        type: String,
-        validate: {
-          validator: function(v) {
-            if (this.role === 'student' || this.role === 'worker') return v && v.trim() !== '';
-            return true;
-          },
-          message: 'Education degree is required for students/workers',
-        },
-      },
-      year: Number,
     },
     lastLogin: Date,
     score: { type: Number, default: function() { return (this.role === 'student' || this.role === 'worker') ? 35 : 0 } },

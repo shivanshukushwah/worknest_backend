@@ -45,7 +45,7 @@ describe('Register endpoint', () => {
     expect(res.body.message).toMatch(/Age is required/i)
   })
 
-  test('should succeed when student provides age', async () => {
+  test('should succeed when student provides age and education', async () => {
     const payload = {
       name: 'Test Student',
       email: 'stu2@example.com',
@@ -54,7 +54,7 @@ describe('Register endpoint', () => {
       role: 'student',
       phone: '+911234567892',
       age: 20,
-      education: { institution: 'Uni', degree: 'BSc', year: 2022 },
+      education: 'BSc Computer Science from XYZ University',
       location: { city: 'City', state: 'ST', country: 'Country' }
     }
     const res = await request(app).post('/api/auth/register').send(payload).expect(201)

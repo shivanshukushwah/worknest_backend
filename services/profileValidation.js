@@ -27,7 +27,8 @@ function validateProfileCompletion(user) {
       if (!user.skills || !Array.isArray(user.skills) || user.skills.length === 0) {
         missing.push('skills')
       }
-      if (!user.education || !user.education.institution || !user.education.degree) {
+      // Education is now stored as a string initially, so just check if it exists
+      if (!user.education || (typeof user.education === 'string' && user.education.trim() === '')) {
         missing.push('education')
       }
     }
