@@ -31,9 +31,14 @@ const getWallet = async (req, res) => {
 const createWallet = async (req, res) => {
   try {
     // Ensure user has completed profile before creating wallet
-    const user = await User.findById(req.user.id).select('phone isPhoneVerified role email businessName businessAddress skills education')
+    const user = await User.findById(req.user.id).select('phone isPhoneVerified role email businessName businessAddress skills education age location')
     if (!user) {
       return ResponseHelper.error(res, "User not found", 404)
+    }
+
+    // Check phone verification explicitly (403 Forbidden)
+    if (!user.isPhoneVerified) {
+      return ResponseHelper.error(res, "Phone number not verified. Please verify your phone number first.", 403)
     }
 
     const { validateProfileCompletion, getMissingFieldsMessage } = require('../services/profileValidation')

@@ -112,9 +112,20 @@ exports.register = async (req, res) => {
     user.phoneOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
     await user.save()
 
+    // prepare response user object without sensitive fields
+    const respUser = user.toObject()
+    delete respUser.password
+    delete respUser.phoneOtp
+    delete respUser.phoneOtpHash
+    delete respUser.phoneOtpExpires
+    delete respUser.phoneOtpSentAt
+    delete respUser.phoneOtpAttempts
+    delete respUser.phoneOtpBlocked
+
     res.status(201).json({ 
       success: true, 
       message: "OTP sent successfully to your email.",
+      user: respUser, // return full user so client can keep registration values
       userId: user._id 
     })
   } catch (err) {
@@ -275,10 +286,18 @@ exports.verifyOtp = async (req, res) => {
 // Resend OTP (with cooldown)
 exports.resendOtp = async (req, res) => {
   try {
-    const { email, userId } = req.body
-    if (!email && !userId) return res.status(400).json({ message: 'Identifier (email or userId) is required' })
+    const { email, userId, phone } = req.body
+    if (!email && !userId && !phone) return res.status(400).json({ message: 'Identifier (email, userId, or phone) is required' })
 
-    const user = userId ? await User.findById(userId) : await User.findOne({ email })
+    let user
+    if (userId) {
+      user = await User.findById(userId)
+    } else if (email) {
+      user = await User.findOne({ email })
+    } else if (phone) {
+      user = await User.findOne({ phone })
+    }
+    
     if (!user) return res.status(404).json({ message: 'User not found' })
 
     if (user.isPhoneVerified) return res.status(400).json({ message: 'Account already verified' })
@@ -288,7 +307,7 @@ exports.resendOtp = async (req, res) => {
     const cooldownMs = 60 * 1000
     if (user.phoneOtpSentAt && now - new Date(user.phoneOtpSentAt).getTime() < cooldownMs) {
       const secondsRemaining = Math.ceil((cooldownMs - (now - new Date(user.phoneOtpSentAt).getTime())) / 1000)
-      return res.status(429).json({ message: `Please wait ${secondsRemaining} seconds before requesting a new OTP.` })
+      return res.status(429).json({ message: `OTP recently sent. Please wait ${secondsRemaining} seconds before requesting a new OTP.` })
     }
 
     // Generate new OTP

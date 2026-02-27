@@ -60,6 +60,10 @@ describe('Register endpoint', () => {
     const res = await request(app).post('/api/auth/register').send(payload).expect(201)
     expect(res.body.success).toBe(true)
     expect(res.body.userId).toBeDefined()
+    // ensure user object in response echoes data
+    expect(res.body.user).toHaveProperty('age', 20)
+    expect(res.body.user).toHaveProperty('education', 'BSc Computer Science from XYZ University')
+    expect(res.body.user).toHaveProperty('phone', '+911234567892')
   })
 
   test('should reject student signup without education', async () => {
@@ -139,7 +143,7 @@ describe('OTP verification and login responses', () => {
 describe('Resend OTP endpoint', () => {
   test('should resend OTP and set phoneOtp and phoneOtpSentAt', async () => {
     const hashed = await bcrypt.hash('password', 10)
-    const user = await User.create({ name: 'Test', email: 't@example.com', password: hashed, phone: '+911234567890', isPhoneVerified: false })
+    const user = await User.create({ name: 'Test', email: 't@example.com', password: hashed, phone: '+911234567890', isPhoneVerified: false, role: 'student' })
 
     const res = await request(app).post('/api/auth/resend-otp').send({ phone: user.phone }).expect(200)
     expect(res.body.success).toBe(true)
@@ -151,7 +155,7 @@ describe('Resend OTP endpoint', () => {
 
   test('should enforce cooldown and return 429 if resent too quickly', async () => {
     const hashed = await bcrypt.hash('password', 10)
-    const user = await User.create({ name: 'Test', email: 't2@example.com', password: hashed, phone: '+919876543210', isPhoneVerified: false, phoneOtpSentAt: new Date() })
+    const user = await User.create({ name: 'Test', email: 't2@example.com', password: hashed, phone: '+919876543210', isPhoneVerified: false, phoneOtpSentAt: new Date(), role: 'student' })
 
     const res = await request(app).post('/api/auth/resend-otp').send({ phone: user.phone }).expect(429)
     expect(res.body.message).toMatch(/OTP recently sent/i)
@@ -161,7 +165,18 @@ describe('Resend OTP endpoint', () => {
 describe('Wallet creation guard', () => {
   test('should block wallet creation when phone not verified', async () => {
     const hashed = await bcrypt.hash('password', 10)
-    const user = await User.create({ name: 'WUser', email: 'w@example.com', password: hashed, phone: '+919000000001', isPhoneVerified: false, role: 'student' })
+    const user = await User.create({ 
+      name: 'WUser', 
+      email: 'w@example.com', 
+      password: hashed, 
+      phone: '+919000000001', 
+      isPhoneVerified: false, 
+      role: 'student',
+      age: 20,
+      location: { city: 'TestCity', state: 'TS', country: 'TestCountry' },
+      education: 'Test Education',
+      skills: ['test']
+    })
 
     const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET)
 
@@ -171,7 +186,18 @@ describe('Wallet creation guard', () => {
 
   test('should allow wallet creation after phone verified', async () => {
     const hashed = await bcrypt.hash('password', 10)
-    const user = await User.create({ name: 'WUser2', email: 'w2@example.com', password: hashed, phone: '+919000000002', isPhoneVerified: true, role: 'student' })
+    const user = await User.create({ 
+      name: 'WUser2', 
+      email: 'w2@example.com', 
+      password: hashed, 
+      phone: '+919000000002', 
+      isPhoneVerified: true, 
+      role: 'student',
+      age: 21,
+      location: { city: 'TestCity', state: 'TS', country: 'TestCountry' },
+      education: 'Test Education',
+      skills: ['test']
+    })
 
     const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET)
 
