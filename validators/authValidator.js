@@ -51,6 +51,30 @@ const validateSignup = (data) => {
         }),
       otherwise: Joi.forbidden(),
     }),
+    education: Joi.when("role", {
+      is: Joi.valid(USER_ROLES.STUDENT, USER_ROLES.WORKER),
+      then: Joi.object({
+        institution: Joi.string().max(100).required().messages({
+          "any.required": "Institution is required for students/workers",
+        }),
+        degree: Joi.string().max(100).required().messages({
+          "any.required": "Degree is required for students/workers",
+        }),
+        year: Joi.number()
+          .integer()
+          .min(1950)
+          .max(new Date().getFullYear() + 10)
+          .messages({
+            "number.base": "Year must be a number",
+            "number.integer": "Year must be an integer",
+            "number.min": "Year seems too far in the past",
+            "number.max": "Year seems too far in the future",
+          }),
+      }).required().messages({
+        "any.required": "Education details are required for students/workers",
+      }),
+      otherwise: Joi.forbidden(),
+    }),
     skills: Joi.when("role", {
       is: Joi.valid(USER_ROLES.STUDENT, USER_ROLES.WORKER),
       then: Joi.array().items(Joi.string().trim()),

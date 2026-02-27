@@ -75,8 +75,26 @@ const userSchema = new mongoose.Schema(
       count: { type: Number, default: 0 },
     },
     education: {
-      institution: String,
-      degree: String,
+      institution: {
+        type: String,
+        validate: {
+          validator: function(v) {
+            if (this.role === 'student' || this.role === 'worker') return v && v.trim() !== '';
+            return true;
+          },
+          message: 'Education institution is required for students/workers',
+        },
+      },
+      degree: {
+        type: String,
+        validate: {
+          validator: function(v) {
+            if (this.role === 'student' || this.role === 'worker') return v && v.trim() !== '';
+            return true;
+          },
+          message: 'Education degree is required for students/workers',
+        },
+      },
       year: Number,
     },
     lastLogin: Date,

@@ -54,11 +54,27 @@ describe('Register endpoint', () => {
       role: 'student',
       phone: '+911234567892',
       age: 20,
+      education: { institution: 'Uni', degree: 'BSc', year: 2022 },
       location: { city: 'City', state: 'ST', country: 'Country' }
     }
     const res = await request(app).post('/api/auth/register').send(payload).expect(201)
     expect(res.body.success).toBe(true)
     expect(res.body.userId).toBeDefined()
+  })
+
+  test('should reject student signup without education', async () => {
+    const payload = {
+      name: 'Test Student',
+      email: 'stu3@example.com',
+      password: 'password',
+      confirmPassword: 'password',
+      role: 'student',
+      phone: '+911234567893',
+      age: 21,
+      location: { city: 'City', state: 'ST', country: 'Country' }
+    }
+    const res = await request(app).post('/api/auth/register').send(payload).expect(400)
+    expect(res.body.message).toMatch(/Education/i)
   })
 })
 
