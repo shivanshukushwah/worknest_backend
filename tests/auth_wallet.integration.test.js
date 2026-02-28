@@ -64,6 +64,10 @@ describe('Register endpoint', () => {
     expect(res.body.user).toHaveProperty('age', 20)
     expect(res.body.user).toHaveProperty('education', 'BSc Computer Science from XYZ University')
     expect(res.body.user).toHaveProperty('phone', '+911234567892')
+    // profile info should reflect completeness ignoring verification
+    expect(res.body.profile).toBeDefined()
+    expect(res.body.profile.isProfileComplete).toBe(true)
+    expect(res.body.profile.missingFields).toHaveLength(0)
   })
 
   test('should reject student signup without education', async () => {
@@ -243,6 +247,39 @@ describe('OTP verification and login responses', () => {
     expect(res.body.success).toBe(true)
     expect(res.body.user).toHaveProperty('education', 'MBA')
     expect(res.body.user).toHaveProperty('location')
+  })
+
+  test('completion status ignores email verification and counts reg data', async () => {
+    const hashed = await bcrypt.hash('password', 10)
+    const user = await User.create({
+      name: 'FillTest',
+      email: 'fill@example.com',
+      password: hashed,
+      role: 'student',
+      phone: '+911234512345',
+      age: 28,
+      education: 'BA',
+      skills: ['coding'],
+      location: { city: 'City', state: 'ST', country: 'Country' },
+      // still unverified
+      isEmailVerified: false,
+    })
+
+    // manually sign token for this user
+    const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET)
+
+    const res = await request(app)
+      .get('/api/users/profile/completion-status')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+
+    expect(res.body.data.isProfileComplete).toBe(true)
+    expect(res.body.data.missingFields).not.toContain('age')
+    expect(res.body.data.missingFields).not.toContain('education')
+    expect(res.body.data.missingFields).not.toContain('skills')
+    expect(res.body.data.missingFields).not.toContain('location')
+    // emailVerified flag should correctly reflect status
+    expect(res.body.data.emailVerified).toBe(false)
   })
 })
 

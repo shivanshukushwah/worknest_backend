@@ -312,11 +312,14 @@ const getProfileCompletionStatus = async (req, res) => {
       return ResponseHelper.error(res, "User not found", 404)
     }
 
-    const profileValidation = validateProfileCompletion(user)
+    // compute completion ignoring verification so frontend can pre‑show
+    // the data entered during signup; verification is reported separately
+    const profileValidation = validateProfileCompletion(user, { ignoreEmailVerification: true })
     ResponseHelper.success(res, {
       isProfileComplete: profileValidation.isComplete,
       missingFields: profileValidation.missingFields,
       role: user.role,
+      emailVerified: !!user.isEmailVerified,
     }, "Profile completion status retrieved successfully")
   } catch (error) {
     console.error("Get profile completion status error:", error)

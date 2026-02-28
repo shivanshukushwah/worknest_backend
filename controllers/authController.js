@@ -149,11 +149,25 @@ exports.register = async (req, res) => {
     delete respUser.emailOtpAttempts
     delete respUser.emailOtpBlocked
 
+    // compute profile completion ignoring email verification (which is false)
+    let profileInfo = {}
+    try {
+      const { validateProfileCompletion } = require('../services/profileValidation')
+      const profileValidation = validateProfileCompletion(user, { ignoreEmailVerification: true })
+      profileInfo = {
+        isProfileComplete: profileValidation.isComplete,
+        missingFields: profileValidation.missingFields,
+      }
+    } catch (e) {
+      console.error('Profile validation during register failed:', e)
+    }
+
     res.status(201).json({ 
       success: true, 
       message: "OTP sent successfully to your email.",
       user: respUser, // return full user so client can keep registration values
-      userId: user._id 
+      userId: user._id,
+      profile: profileInfo,
     })
   } catch (err) {
     console.error("Register error:", err)

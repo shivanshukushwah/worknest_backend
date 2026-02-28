@@ -4,11 +4,12 @@
  * Check if a user's profile is complete based on their role and userType.
  * Returns { isComplete: boolean, missingFields: string[] }
  */
-function validateProfileCompletion(user) {
+function validateProfileCompletion(user, options = {}) {
+  const { ignoreEmailVerification = false } = options
   const missing = []
 
   // Common requirements for all roles
-  if (!user.isEmailVerified) {
+  if (!ignoreEmailVerification && !user.isEmailVerified) {
     missing.push('email_not_verified')
   }
 
