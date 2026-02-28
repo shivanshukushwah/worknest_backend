@@ -5,49 +5,79 @@
  * Returns { isComplete: boolean, missingFields: string[] }
  */
 function validateProfileCompletion(user, options = {}) {
-  const { ignoreEmailVerification = false } = options
+  const { ignoreEmailVerification = false, includeOptional = false } = options
   const missing = []
+  let total = 0
 
   // Common requirements for all roles
-  if (!ignoreEmailVerification && !user.isEmailVerified) {
-    missing.push('email_not_verified')
+  if (!ignoreEmailVerification) {
+    total++
+    if (!user.isEmailVerified) {
+      missing.push('email_not_verified')
+    }
   }
 
   // Role-specific requirements
   if (user.role === 'student' || user.role === 'worker') {
     // Both student and worker types need age and location
+    total++
     if (!user.age || user.age <= 0) {
       missing.push('age')
     }
+
+    total++
     if (!user.location || !user.location.city || !user.location.state || !user.location.country) {
       missing.push('location')
     }
 
     // Student type specific requirements
     if (user.userType === 'student') {
+      total++
       if (!user.skills || !Array.isArray(user.skills) || user.skills.length === 0) {
         missing.push('skills')
       }
       // Education is now stored as a string initially, so just check if it exists
+      total++
       if (!user.education || (typeof user.education === 'string' && user.education.trim() === '')) {
         missing.push('education')
       }
     }
-    // Worker type: only age and location needed (already checked above)
+
+    // Optional fields (not required for completeness but count towards percentage)
+    if (includeOptional) {
+      total++
+      if (!user.avatar && !user.profilePicture) {
+        missing.push('avatar')
+      }
+    }
   }
 
   if (user.role === 'employer') {
+    total++
     if (!user.businessName || user.businessName.trim() === '') {
       missing.push('businessName')
     }
+    total++
     if (!user.businessAddress || !user.businessAddress.city || user.businessAddress.city.trim() === '') {
       missing.push('businessLocation')
     }
+    if (includeOptional) {
+      total++
+      if (!user.avatar && !user.profilePicture) {
+        missing.push('avatar')
+      }
+    }
   }
+
+  const filled = total - missing.length
+  const percentage = total > 0 ? Math.round((filled / total) * 100) : 100
 
   return {
     isComplete: missing.length === 0,
     missingFields: missing,
+    totalFields: total,
+    filledFields: filled,
+    percentage,
   }
 }
 

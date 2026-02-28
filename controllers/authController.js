@@ -153,10 +153,13 @@ exports.register = async (req, res) => {
     let profileInfo = {}
     try {
       const { validateProfileCompletion } = require('../services/profileValidation')
-      const profileValidation = validateProfileCompletion(user, { ignoreEmailVerification: true })
+      const profileValidation = validateProfileCompletion(user, { ignoreEmailVerification: true, includeOptional: true })
       profileInfo = {
         isProfileComplete: profileValidation.isComplete,
         missingFields: profileValidation.missingFields,
+        totalFields: profileValidation.totalFields,
+        filledFields: profileValidation.filledFields,
+        percentage: profileValidation.percentage,
       }
     } catch (e) {
       console.error('Profile validation during register failed:', e)

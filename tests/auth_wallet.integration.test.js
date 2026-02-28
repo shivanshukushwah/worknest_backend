@@ -68,6 +68,10 @@ describe('Register endpoint', () => {
     expect(res.body.profile).toBeDefined()
     expect(res.body.profile.isProfileComplete).toBe(true)
     expect(res.body.profile.missingFields).toHaveLength(0)
+    // new fields added for percentage
+    expect(res.body.profile).toHaveProperty('percentage', 100)
+    expect(res.body.profile.totalFields).toBeGreaterThan(0)
+    expect(res.body.profile.filledFields).toBe(res.body.profile.totalFields)
   })
 
   test('should reject student signup without education', async () => {
@@ -175,6 +179,26 @@ describe('OTP verification and login responses', () => {
     expect(res.body.user.isEmailVerified).toBe(true)
   })
 
+  test('completion status returns partial percentage when some fields are missing', async () => {
+    const hashed = await bcrypt.hash('password', 10)
+    const user = await User.create({
+      name: 'Partial',
+      email: 'partial@example.com',
+      password: hashed,
+      role: 'student',
+      // only email and name provided, nothing else
+      isEmailVerified: false,
+    })
+
+    const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET)
+    const res = await request(app)
+      .get('/api/users/profile/completion-status')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+    expect(res.body.data.percentage).toBeLessThan(100)
+    expect(res.body.data.filledFields).toBeLessThan(res.body.data.totalFields)
+  })
+
   test('resendOtp returns 404 and prompts re-register when OTP has expired', async () => {
     const hashed = await bcrypt.hash('password', 10)
     const old = await User.create({
@@ -280,6 +304,9 @@ describe('OTP verification and login responses', () => {
     expect(res.body.data.missingFields).not.toContain('location')
     // emailVerified flag should correctly reflect status
     expect(res.body.data.emailVerified).toBe(false)
+    expect(res.body.data.percentage).toBe(100)
+    expect(res.body.data.totalFields).toBeGreaterThan(0)
+    expect(res.body.data.filledFields).toBe(res.body.data.totalFields)
   })
 })
 

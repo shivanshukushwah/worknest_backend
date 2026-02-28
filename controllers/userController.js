@@ -82,7 +82,18 @@ const getUserById = async (req, res) => {
       return ResponseHelper.error(res, "User account is deactivated", 404)
     }
 
-    ResponseHelper.success(res, user, "User profile retrieved successfully")
+    // attach computed profile completion info so clients don't need a second call
+    const profileValidation = validateProfileCompletion(user, { ignoreEmailVerification: true, includeOptional: true })
+    const responseData = user.toObject()
+    responseData.profileCompletion = {
+      isProfileComplete: profileValidation.isComplete,
+      missingFields: profileValidation.missingFields,
+      totalFields: profileValidation.totalFields,
+      filledFields: profileValidation.filledFields,
+      percentage: profileValidation.percentage,
+    }
+
+    ResponseHelper.success(res, responseData, "User profile retrieved successfully")
   } catch (error) {
     console.error("Get user by ID error:", error)
     ResponseHelper.error(res, "Server error", 500)
@@ -314,10 +325,13 @@ const getProfileCompletionStatus = async (req, res) => {
 
     // compute completion ignoring verification so frontend can pre‑show
     // the data entered during signup; verification is reported separately
-    const profileValidation = validateProfileCompletion(user, { ignoreEmailVerification: true })
+    const profileValidation = validateProfileCompletion(user, { ignoreEmailVerification: true, includeOptional: true })
     ResponseHelper.success(res, {
       isProfileComplete: profileValidation.isComplete,
       missingFields: profileValidation.missingFields,
+      totalFields: profileValidation.totalFields,
+      filledFields: profileValidation.filledFields,
+      percentage: profileValidation.percentage,
       role: user.role,
       emailVerified: !!user.isEmailVerified,
     }, "Profile completion status retrieved successfully")

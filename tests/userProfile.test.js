@@ -54,6 +54,11 @@ describe('User profile fields', () => {
     expect(user).toHaveProperty('avatar')
     expect(user).toHaveProperty('rating')
     expect(user).toHaveProperty('score')
+    // profile completion info should be included
+    expect(user).toHaveProperty('profileCompletion')
+    expect(user.profileCompletion).toHaveProperty('percentage')
+    expect(user.profileCompletion.percentage).toBeGreaterThanOrEqual(0)
+    expect(user.profileCompletion.percentage).toBeLessThanOrEqual(100)
     // password should never be returned
     expect(user.password).toBeUndefined()
     // OTP fields should not leak
@@ -83,6 +88,10 @@ describe('User profile fields', () => {
     expect(user).toHaveProperty('businessType', 'cafe')
     expect(user).toHaveProperty('businessAddress')
     expect(user.businessAddress).toHaveProperty('city', 'Mumbai')
+    expect(user).toHaveProperty('profileCompletion')
+    expect(user.profileCompletion).toHaveProperty('percentage')
+    expect(user.profileCompletion.percentage).toBeGreaterThanOrEqual(0)
+    expect(user.profileCompletion.percentage).toBeLessThanOrEqual(100)
     expect(user.password).toBeUndefined()
     expect(user.emailOtp).toBeUndefined()
   })
