@@ -74,7 +74,7 @@ Content-Type: application/json
 ```
 
 **What Happens:**
-- User created in database (isPhoneVerified = false)
+- User created in database (isEmailVerified = false)
 - SMS sent to +919876543210 with OTP code
 - OTP is NOT in response (secure) ✅
 
@@ -103,7 +103,7 @@ Content-Type: application/json
     "name": "John Doe",
     "email": "john@example.com",
     "role": "student",
-    "isPhoneVerified": true
+    "isEmailVerified": true
   }
 }
 ```

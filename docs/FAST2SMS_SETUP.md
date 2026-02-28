@@ -102,7 +102,7 @@ NODE_ENV=production  # or development
     "email": "john@example.com",
     "phone": "+919876543210",
     "role": "student",
-    "isPhoneVerified": true
+    "isEmailVerified": true
   }
 }
 ```
@@ -195,9 +195,9 @@ const otp = Math.floor(100000 + Math.random() * 900000).toString()
 ```javascript
 {
   phone: "+919876543210",
-  phoneOtp: "123456",
-  phoneOtpExpiry: 2024-02-07T10:10:00.000Z,  // 10 minutes from creation
-  isPhoneVerified: false
+  phoneOtp: "123456",  # legacy field (now replaced by emailOtp)
+  phoneOtpExpiry: 2024-02-07T10:10:00.000Z,  // 10 minutes from creation (legacy)
+  isEmailVerified: false
 }
 ```
 

@@ -24,7 +24,7 @@
       process.exit(1)
     }
 
-    console.log('Found user:', { id: user._id.toString(), email: user.email, isActive: user.isActive, isPhoneVerified: user.isPhoneVerified })
+    console.log('Found user:', { id: user._id.toString(), email: user.email, isActive: user.isActive, isEmailVerified: user.isEmailVerified })
     console.log('Stored password hash:', user.password)
 
     const match = bcrypt.compareSync(password, user.password)

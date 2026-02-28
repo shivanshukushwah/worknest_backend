@@ -71,7 +71,7 @@
               "",
               "pm.test('User verified', function() {",
               "    var jsonData = pm.response.json();",
-              "    pm.expect(jsonData.user.isPhoneVerified).to.equal(true);",
+              "    pm.expect(jsonData.user.isEmailVerified).to.equal(true);",
               "});",
               "",
               "// Save JWT token for authenticated requests",

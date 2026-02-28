@@ -29,8 +29,8 @@ afterEach(async () => {
 })
 
 test('new student gets initial score and job completion awards points', async () => {
-  const student = await User.create({ name: 'S', email: 's@example.com', password: 'p', role: 'student', phone: '+91111111', isPhoneVerified: true })
-  const employer = await User.create({ name: 'E', email: 'e@example.com', password: 'p', role: 'employer', phone: '+92222222', isPhoneVerified: true })
+  const student = await User.create({ name: 'S', email: 's@example.com', password: 'p', role: 'student', phone: '+91111111', isEmailVerified: true })
+  const employer = await User.create({ name: 'E', email: 'e@example.com', password: 'p', role: 'employer', phone: '+92222222', isEmailVerified: true })
 
   const job = await Job.create({ title: 'Test Job', description: 'x', category: 'a', budget: 100, duration: '2', employer: employer._id, assignedStudent: student._id, assignedStudents: [student._id], studentAccepted: true, status: 'in_progress' })
 
@@ -46,8 +46,8 @@ test('new student gets initial score and job completion awards points', async ()
 })
 
 test('on-time submission awards on-time score', async () => {
-  const student = await User.create({ name: 'S2', email: 's2@example.com', password: 'p', role: 'student', phone: '+91111112', isPhoneVerified: true })
-  const employer = await User.create({ name: 'E2', email: 'e2@example.com', password: 'p', role: 'employer', phone: '+92222223', isPhoneVerified: true })
+  const student = await User.create({ name: 'S2', email: 's2@example.com', password: 'p', role: 'student', phone: '+91111112', isEmailVerified: true })
+  const employer = await User.create({ name: 'E2', email: 'e2@example.com', password: 'p', role: 'employer', phone: '+92222223', isEmailVerified: true })
 
   const job = await Job.create({ title: 'Test Job2', description: 'x', category: 'a', budget: 100, duration: '5', employer: employer._id, assignedStudent: student._id, assignedStudents: [student._id], studentAccepted: true, status: 'in_progress' })
 
@@ -61,8 +61,8 @@ test('on-time submission awards on-time score', async () => {
 })
 
 test('application rejection does not penalize student', async () => {
-  const student = await User.create({ name: 'S3', email: 's3@example.com', password: 'p', role: 'student', phone: '+91111113', isPhoneVerified: true })
-  const employer = await User.create({ name: 'E3', email: 'e3@example.com', password: 'p', role: 'employer', phone: '+92222224', isPhoneVerified: true })
+  const student = await User.create({ name: 'S3', email: 's3@example.com', password: 'p', role: 'student', phone: '+91111113', isEmailVerified: true })
+  const employer = await User.create({ name: 'E3', email: 'e3@example.com', password: 'p', role: 'employer', phone: '+92222224', isEmailVerified: true })
 
   const job = await Job.create({ title: 'Test Job3', description: 'x', category: 'a', budget: 100, duration: '5', employer: employer._id, applications: [{ student: student._id, coverLetter: 'x' }] })
 

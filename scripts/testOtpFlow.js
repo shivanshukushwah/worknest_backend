@@ -36,9 +36,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('User from DB:', { phone: user.phone, phoneOtp: user.phoneOtp, isPhoneVerified: user.isPhoneVerified, phoneOtpExpires: user.phoneOtpExpires });
+  console.log('User from DB:', { phone: user.phone, emailOtp: user.emailOtp, isEmailVerified: user.isEmailVerified, emailOtpExpires: user.emailOtpExpires });
 
-  const otp = user.phoneOtp;
+  const otp = user.emailOtp;
   if (!otp) {
     console.error('OTP not found in DB (ensure NODE_ENV=test)');
     process.exit(1);

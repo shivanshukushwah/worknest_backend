@@ -25,6 +25,10 @@ This backend is designed for **real deployment**, not just demos or hackathons.
 - Student & Employer roles
 - Phone verification via OTP
 - JWT-based authentication
+- Signup now stores a **temporary user record** that is only kept until
+  successful OTP verification. Expired/unverified records are automatically
+  purged (TTL index) and cleaned up during new registration attempts to avoid
+  ghost accounts and confusing "already registered" errors.
 - Secure login/logout lifecycle
 
 ### 💼 Jobs & Applications

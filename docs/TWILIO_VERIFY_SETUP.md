@@ -104,7 +104,7 @@ NODE_ENV=production  # or development
     "name": "John Doe",
     "email": "john@example.com",
     "role": "student",
-    "isPhoneVerified": true
+    "isEmailVerified": true
   }
 }
 ```
@@ -189,7 +189,7 @@ Content-Type: application/json
 ```
 1. User submits registration form with phone number
    ↓
-2. Backend creates user in database (isPhoneVerified = false)
+2. Backend creates user in database (isEmailVerified = false)
    ↓
 3. Backend calls verifyService.sendOtp(phone)
    ↓

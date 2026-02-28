@@ -7,16 +7,17 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     role: { type: String, enum: ["student", "worker", "employer", "admin"], required: true },
     phone: { type: String, sparse: true },
-    isPhoneVerified: { type: Boolean, default: false },
+    // indicates whether the user's email OTP has been verified
+    isEmailVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     isProfileComplete: { type: Boolean, default: false },
-    // OTP fields
-    phoneOtp: String,
-    phoneOtpHash: String,
-    phoneOtpExpires: Date,
-    phoneOtpSentAt: Date,
-    phoneOtpAttempts: { type: Number, default: 0 },
-    phoneOtpBlocked: { type: Boolean, default: false },
+    // OTP fields (sent to email)
+    emailOtp: String,
+    emailOtpHash: String,
+    emailOtpExpires: Date,
+    emailOtpSentAt: Date,
+    emailOtpAttempts: { type: Number, default: 0 },
+    emailOtpBlocked: { type: Boolean, default: false },
 
     // Business fields (for employers)
     businessName: String,
@@ -104,5 +105,11 @@ userSchema.index({ email: 1, role: 1 }, { unique: true })
 
 // Same phone can have different roles (student, employer) but not duplicate within same role
 userSchema.index({ phone: 1, role: 1 }, { unique: true, sparse: true })
+
+// Automatically remove unverified/expired users by setting a TTL index on the OTP expiry field.
+// When `emailOtpExpires` passes and the document still exists, MongoDB will delete it.
+// We only set this field for accounts awaiting OTP verification; it is cleared upon
+// successful verification so verified users are never removed.
+userSchema.index({ emailOtpExpires: 1 }, { expireAfterSeconds: 0 })
 
 module.exports = mongoose.model("User", userSchema)

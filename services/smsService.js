@@ -9,7 +9,8 @@ async function sendSms(to, body) {
   // Ensure phone is provided
   if (!to || !body) return false
 
-  // In tests or development, do nothing and allow assertions that rely on DB phoneOtp
+  // In tests or development, do nothing. (Originally this allowed assertions on
+// `phoneOtp` field, but the project now uses emailOtp.)
   if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') return true
 
   if (FAST2SMS_API_KEY) {

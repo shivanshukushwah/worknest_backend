@@ -54,6 +54,11 @@ describe('User profile fields', () => {
     expect(user).toHaveProperty('avatar')
     expect(user).toHaveProperty('rating')
     expect(user).toHaveProperty('score')
+    // password should never be returned
+    expect(user.password).toBeUndefined()
+    // OTP fields should not leak
+    expect(user.emailOtp).toBeUndefined()
+    expect(user.emailOtpExpires).toBeUndefined()
   })
 
   test('employer profile contains businessAddress and businessType', async () => {
@@ -78,5 +83,7 @@ describe('User profile fields', () => {
     expect(user).toHaveProperty('businessType', 'cafe')
     expect(user).toHaveProperty('businessAddress')
     expect(user.businessAddress).toHaveProperty('city', 'Mumbai')
+    expect(user.password).toBeUndefined()
+    expect(user.emailOtp).toBeUndefined()
   })
 })

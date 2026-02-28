@@ -80,6 +80,63 @@ describe('Register endpoint', () => {
     const res = await request(app).post('/api/auth/register').send(payload).expect(400)
     expect(res.body.message).toMatch(/Education/i)
   })
+
+  test('should block re-registration when previous OTP is still valid', async () => {
+    const payload = {
+      name: 'First User',
+      email: 'pending@example.com',
+      password: 'password',
+      confirmPassword: 'password',
+      role: 'student',
+      phone: '+911234567894',
+      age: 23,
+      education: 'BS',
+      location: { city: 'City', state: 'ST', country: 'Country' }
+    }
+    // first registration creates a user with an unexpired OTP
+    await request(app).post('/api/auth/register').send(payload).expect(201)
+
+    // second attempt should be rejected with pending verification message
+    const res2 = await request(app).post('/api/auth/register').send(payload).expect(409)
+    expect(res2.body.message).toMatch(/pending verification/i)
+  })
+
+  test('should allow re-registration after OTP expiry and clean up ghost user', async () => {
+    // create expired unverified user manually
+    const hashed = await bcrypt.hash('password', 10)
+    const old = await User.create({
+      name: 'Expired',
+      email: 'expired@example.com',
+      password: hashed,
+      role: 'student',
+      phone: '+911234567895',
+      age: 30,
+      education: 'BA',
+      location: { city: 'City', state: 'ST', country: 'Country' },
+      emailOtp: '000000',
+      emailOtpExpires: new Date(Date.now() - 1000), // already expired
+      isEmailVerified: false,
+    })
+
+    const payload = {
+      name: 'New User',
+      email: 'expired@example.com',
+      password: 'password',
+      confirmPassword: 'password',
+      role: 'student',
+      phone: '+911234567895',
+      age: 31,
+      education: 'BS',
+      location: { city: 'City', state: 'ST', country: 'Country' }
+    }
+
+    const res = await request(app).post('/api/auth/register').send(payload).expect(201)
+    expect(res.body.success).toBe(true)
+
+    const remaining = await User.find({ email: 'expired@example.com', role: 'student' })
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0]._id.toString()).not.toBe(old._id.toString())
+  })
 })
 
 describe('OTP verification and login responses', () => {
@@ -96,9 +153,9 @@ describe('OTP verification and login responses', () => {
       education: 'BSc Physics',
       skills: ['math'],
       location: { city: 'City', state: 'ST', country: 'Country' },
-      phoneOtp: '123456',
-      phoneOtpExpires: new Date(Date.now() + 10 * 60 * 1000),
-      isPhoneVerified: false,
+      emailOtp: '123456',
+      emailOtpExpires: new Date(Date.now() + 10 * 60 * 1000),
+      isEmailVerified: false,
     })
 
     const res = await request(app)
@@ -111,7 +168,56 @@ describe('OTP verification and login responses', () => {
     expect(res.body.user.age).toBe(22)
     expect(res.body.user.education).toBe('BSc Physics')
     expect(res.body.user.isProfileComplete).toBe(true)
-    expect(res.body.user.isPhoneVerified).toBe(true)
+    expect(res.body.user.isEmailVerified).toBe(true)
+  })
+
+  test('resendOtp returns 404 and prompts re-register when OTP has expired', async () => {
+    const hashed = await bcrypt.hash('password', 10)
+    const old = await User.create({
+      name: 'Expired2',
+      email: 'resend-expired@example.com',
+      password: hashed,
+      role: 'student',
+      phone: '+911234560000',
+      emailOtp: '999999',
+      emailOtpExpires: new Date(Date.now() - 1000),
+      isEmailVerified: false,
+    })
+
+    const res = await request(app)
+      .post('/api/auth/resend-otp')
+      .send({ email: 'resend-expired@example.com' })
+      .expect(404)
+    expect(res.body.message).toMatch(/register again/i)
+
+    // ensure old record was deleted
+    const found = await User.findOne({ email: 'resend-expired@example.com' })
+    expect(found).toBeNull()
+  })
+
+  test('otpCleanup job removes expired unverified users', async () => {
+    const hashed = await bcrypt.hash('password', 10)
+    await User.create({
+      name: 'CleanupTest',
+      email: 'cleanup@example.com',
+      password: hashed,
+      role: 'student',
+      phone: '+911234560001',
+      emailOtp: '111111',
+      emailOtpExpires: new Date(Date.now() - 5000),
+      isEmailVerified: false,
+    })
+
+    // manually invoke cleanup logic
+    const { startOtpCleanup, stopOtpCleanup } = require('../services/otpCleanup')
+    // call cleanup once synchronously by reusing internal code (refactor below if necessary)
+    await require('../services/otpCleanup').startOtpCleanup(1) // start with tiny interval
+    // wait a moment for interval to run
+    await new Promise(r => setTimeout(r, 20))
+    stopOtpCleanup()
+
+    const wiped = await User.findOne({ email: 'cleanup@example.com' })
+    expect(wiped).toBeNull()
   })
 
   test('login returns full user object', async () => {
@@ -126,7 +232,7 @@ describe('OTP verification and login responses', () => {
       education: 'MBA',
       skills: ['business'],
       location: { city: 'City', state: 'ST', country: 'Country' },
-      isPhoneVerified: true,
+      isEmailVerified: true,
     })
 
     const res = await request(app)
@@ -141,23 +247,23 @@ describe('OTP verification and login responses', () => {
 })
 
 describe('Resend OTP endpoint', () => {
-  test('should resend OTP and set phoneOtp and phoneOtpSentAt', async () => {
+  test('should resend OTP and set emailOtp and emailOtpSentAt', async () => {
     const hashed = await bcrypt.hash('password', 10)
-    const user = await User.create({ name: 'Test', email: 't@example.com', password: hashed, phone: '+911234567890', isPhoneVerified: false, role: 'student' })
+    const user = await User.create({ name: 'Test', email: 't@example.com', password: hashed, phone: '+911234567890', isEmailVerified: false, role: 'student' })
 
-    const res = await request(app).post('/api/auth/resend-otp').send({ phone: user.phone }).expect(200)
+    const res = await request(app).post('/api/auth/resend-otp').send({ email: user.email }).expect(200)
     expect(res.body.success).toBe(true)
 
     const fresh = await User.findById(user._id)
-    expect(fresh.phoneOtp).toBeDefined()
-    expect(fresh.phoneOtpSentAt).toBeDefined()
+    expect(fresh.emailOtp).toBeDefined()
+    expect(fresh.emailOtpSentAt).toBeDefined()
   })
 
   test('should enforce cooldown and return 429 if resent too quickly', async () => {
     const hashed = await bcrypt.hash('password', 10)
-    const user = await User.create({ name: 'Test', email: 't2@example.com', password: hashed, phone: '+919876543210', isPhoneVerified: false, phoneOtpSentAt: new Date(), role: 'student' })
+    const user = await User.create({ name: 'Test', email: 't2@example.com', password: hashed, phone: '+919876543210', isEmailVerified: false, emailOtpSentAt: new Date(), role: 'student' })
 
-    const res = await request(app).post('/api/auth/resend-otp').send({ phone: user.phone }).expect(429)
+    const res = await request(app).post('/api/auth/resend-otp').send({ email: user.email }).expect(429)
     expect(res.body.message).toMatch(/OTP recently sent/i)
   })
 })
@@ -170,7 +276,7 @@ describe('Wallet creation guard', () => {
       email: 'w@example.com', 
       password: hashed, 
       phone: '+919000000001', 
-      isPhoneVerified: false, 
+      isEmailVerified: false, 
       role: 'student',
       age: 20,
       location: { city: 'TestCity', state: 'TS', country: 'TestCountry' },
@@ -181,7 +287,7 @@ describe('Wallet creation guard', () => {
     const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET)
 
     const res = await request(app).post('/api/wallet').set('Authorization', `Bearer ${token}`).send().expect(403)
-    expect(res.body.message).toMatch(/Phone number not verified/i)
+    expect(res.body.message).toMatch(/Email not verified/i)
   })
 
   test('should allow wallet creation after phone verified', async () => {
@@ -191,7 +297,7 @@ describe('Wallet creation guard', () => {
       email: 'w2@example.com', 
       password: hashed, 
       phone: '+919000000002', 
-      isPhoneVerified: true, 
+      isEmailVerified: true, 
       role: 'student',
       age: 21,
       location: { city: 'TestCity', state: 'TS', country: 'TestCountry' },

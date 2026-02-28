@@ -8,8 +8,8 @@ function validateProfileCompletion(user) {
   const missing = []
 
   // Common requirements for all roles
-  if (!user.phone || !user.isPhoneVerified) {
-    missing.push('phone_not_verified')
+  if (!user.isEmailVerified) {
+    missing.push('email_not_verified')
   }
 
   // Role-specific requirements
@@ -55,7 +55,7 @@ function validateProfileCompletion(user) {
  */
 function getMissingFieldsMessage(missingFields) {
   const fieldLabels = {
-    phone_not_verified: 'Phone verification',
+    email_not_verified: 'Email verification',
     skills: 'Skills',
     education: 'Education details',
     location: 'Location (city, state, country)',

@@ -1,5 +1,9 @@
 # 🎉 Twilio Verify OTP System - Implementation Complete!
 
+> **NOTE:** This document describes the legacy Twilio SMS OTP implementation. The
+> current project uses **email‑based OTP**, so some details below may not apply.
+
+
 ## ✅ PROJECT SUMMARY
 
 A **production-ready** OTP verification system using **Twilio Verify** has been successfully implemented for your backend.
@@ -90,7 +94,7 @@ POST http://localhost:5000/api/auth/register
   }
 }
 ```
-→ Receive SMS with OTP
+→ Receive email with OTP
 
 ### Step 4: Test Verify OTP
 ```
@@ -117,7 +121,7 @@ Response: { success, message, userId }  ← NO otp!
 ```
 POST /api/auth/verify-otp
 Status: 200
-Response: { token, user { isPhoneVerified: true } }
+Response: { token, user { isEmailVerified: true } }
 ```
 
 ### Resend OTP

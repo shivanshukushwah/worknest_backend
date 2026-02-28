@@ -14,7 +14,7 @@
 ┌─────────────────────────────────────────────────────────┐
 │                                                           │
 │  API: POST /api/auth/register                           │
-│  - Create user (isPhoneVerified = false)                │
+│  - Create user (isEmailVerified = false)                │
 │  - Call: verifyService.sendOtp(phone)                   │
 │  - Response: userId (NO otp) ✅                         │
 │                                                           │
@@ -100,7 +100,7 @@
 │  {                                                       │
 │    "token": "eyJhbGc...",                               │
 │    "user": {                                            │
-│      "isPhoneVerified": true,                           │
+│      "isEmailVerified": true,                           │
 │      ...                                                │
 │    }                                                     │
 │  }                                                       │
@@ -121,9 +121,15 @@ User Registration Flow
 STEP 1: Register
   Input: name, email, password, phone, role, location
          ↓
-  Backend Creates: User in DB (isPhoneVerified = false)
+  Backend Creates: temporary User record in DB (isEmailVerified = false)
+       • record carries OTP expiry field with TTL index so unverified
+         accounts are automatically removed when the window closes.
+       • If an existing unverified account is found during a new
+         registration attempt, the server deletes it if its OTP has
+         expired; otherwise the client is asked to verify or request a
+         new code.
          ↓
-  Backend Requests: OTP from Twilio
+  Backend Requests: OTP from Twilio / email service
          ↓
   Output: Success message + userId (NO OTP)
 
@@ -141,7 +147,7 @@ STEP 3: Verify OTP
          ↓
   Twilio Validates: OTP matches & not expired
          ↓
-  Backend Updates: isPhoneVerified = true
+  Backend Updates: isEmailVerified = true
          ↓
   Output: JWT token + authenticated user
 
@@ -173,7 +179,7 @@ Verify Response:                Verify Response:
 {                               {
   "token": "...",                "token": "...",
   "user": {...}                  "user": {
-}                                  "isPhoneVerified": true,
+}                                  "isEmailVerified": true,
                                   ...
                                 }
                                 }

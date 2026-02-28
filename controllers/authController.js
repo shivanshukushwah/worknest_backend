@@ -2,7 +2,6 @@ const User = require("../models/User")
 const jwt = require("jsonwebtoken")
 const bcrypt = require("bcrypt")
 const crypto = require("crypto")
-const verifyService = require("../services/verifyService")
 const emailService = require("../services/emailService")
 const { validateSignup, validateLogin, validateForgotPassword, validateResetPassword } = require("../validators/authValidator")
 
@@ -34,29 +33,57 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Passwords do not match" })
     }
 
-    // Check if user already has this role with same email
+    // Before creating a new user, check for any conflicting accounts.  If we find an
+    // unverified user whose OTP has already expired we delete that record so the
+    // newcomer isn't blocked by a ghost account.  Otherwise we return the usual
+    // conflict message (with a hint to verify or resend OTP when appropriate).
+    const now = new Date()
+
     const existingUser = await User.findOne({ email, role })
     if (existingUser) {
-      return res.status(409).json({ message: `You already have a ${role} account with this email` })
+      if (!existingUser.isEmailVerified) {
+        if (existingUser.emailOtpExpires && now > existingUser.emailOtpExpires) {
+          // OTP window passed – clean up and allow fresh registration
+          await User.deleteOne({ _id: existingUser._id })
+        } else {
+          return res.status(409).json({
+            message: `A ${role} account with this email is pending verification. Please check your email OTP or request a new one.`
+          })
+        }
+      } else {
+        // already verified user exists
+        return res.status(409).json({ message: `You already have a ${role} account with this email` })
+      }
     }
+
     // Also ensure phone isn't already registered with the same role
     if (phone) {
       const existingPhoneUser = await User.findOne({ phone, role })
       if (existingPhoneUser) {
-        return res.status(409).json({ message: `This phone number is already registered as a ${role}` })
+        if (!existingPhoneUser.isEmailVerified) {
+          if (existingPhoneUser.emailOtpExpires && now > existingPhoneUser.emailOtpExpires) {
+            await User.deleteOne({ _id: existingPhoneUser._id })
+          } else {
+            return res.status(409).json({
+              message: `A ${role} account with this phone number is pending verification. Please check your email OTP or request a new one.`
+            })
+          }
+        } else {
+          return res.status(409).json({ message: `This phone number is already registered as a ${role}` })
+        }
       }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // Create user but do not issue token until phone verified
+    // Create user but do not issue token until email verified
     const userData = {
       name,
       email,
       password: hashedPassword,
       role,
       phone,
-      isPhoneVerified: false,
+      isEmailVerified: false,
     }
 
     if ((role === 'student' || role === 'worker') && location) {
@@ -108,19 +135,19 @@ exports.register = async (req, res) => {
     }
 
     // Store OTP in database
-    user.phoneOtp = otp
-    user.phoneOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+    user.emailOtp = otp
+    user.emailOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
     await user.save()
 
     // prepare response user object without sensitive fields
     const respUser = user.toObject()
     delete respUser.password
-    delete respUser.phoneOtp
-    delete respUser.phoneOtpHash
-    delete respUser.phoneOtpExpires
-    delete respUser.phoneOtpSentAt
-    delete respUser.phoneOtpAttempts
-    delete respUser.phoneOtpBlocked
+    delete respUser.emailOtp
+    delete respUser.emailOtpHash
+    delete respUser.emailOtpExpires
+    delete respUser.emailOtpSentAt
+    delete respUser.emailOtpAttempts
+    delete respUser.emailOtpBlocked
 
     res.status(201).json({ 
       success: true, 
@@ -158,9 +185,9 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" })
     }
 
-    // Enforce phone verification if phone is present
-    if (user.phone && !user.isPhoneVerified) {
-      return res.status(403).json({ message: "Phone not verified. Please verify your phone to proceed." })
+    // Enforce email verification
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ message: "Email not verified. Please verify your email to proceed." })
     }
 
     console.log("SIGN SECRET:", JWT_SECRET)
@@ -174,12 +201,12 @@ exports.login = async (req, res) => {
     // prepare full user data for response
     const userObj = user.toObject()
     delete userObj.password
-    delete userObj.phoneOtp
-    delete userObj.phoneOtpHash
-    delete userObj.phoneOtpExpires
-    delete userObj.phoneOtpSentAt
-    delete userObj.phoneOtpAttempts
-    delete userObj.phoneOtpBlocked
+    delete userObj.emailOtp
+    delete userObj.emailOtpHash
+    delete userObj.emailOtpExpires
+    delete userObj.emailOtpSentAt
+    delete userObj.emailOtpAttempts
+    delete userObj.emailOtpBlocked
 
     res.json({
       success: true,
@@ -206,28 +233,28 @@ exports.verifyOtp = async (req, res) => {
       user = await User.findOne({ email })
     } else {
       // no identifier provided; try to locate by OTP
-      user = await User.findOne({ phoneOtp: otp })
+      user = await User.findOne({ emailOtp: otp })
     }
     if (!user) return res.status(404).json({ message: 'User not found' })
 
     // Check if OTP exists and hasn't expired
-    if (!user.phoneOtp) {
+    if (!user.emailOtp) {
       return res.status(400).json({ message: 'No OTP found. Please request a new one.' })
     }
 
-    if (user.phoneOtpExpires && new Date() > user.phoneOtpExpires) {
+    if (user.emailOtpExpires && new Date() > user.emailOtpExpires) {
       return res.status(400).json({ message: 'OTP has expired. Please request a new one.' })
     }
 
     // Verify OTP
-    if (user.phoneOtp !== otp) {
+    if (user.emailOtp !== otp) {
       return res.status(400).json({ message: 'Invalid OTP' })
     }
 
-    // Mark phone as verified and clear OTP
-    user.isPhoneVerified = true
-    user.phoneOtp = null
-    user.phoneOtpExpires = null
+    // Mark email as verified and clear OTP
+    user.isEmailVerified = true
+    user.emailOtp = null
+    user.emailOtpExpires = null
 
     // Determine profile completeness and update flag if needed
     try {
@@ -264,12 +291,12 @@ exports.verifyOtp = async (req, res) => {
     // Return full user object (omit sensitive fields)
     const userObj = user.toObject()
     delete userObj.password
-    delete userObj.phoneOtp
-    delete userObj.phoneOtpHash
-    delete userObj.phoneOtpExpires
-    delete userObj.phoneOtpSentAt
-    delete userObj.phoneOtpAttempts
-    delete userObj.phoneOtpBlocked
+    delete userObj.emailOtp
+    delete userObj.emailOtpHash
+    delete userObj.emailOtpExpires
+    delete userObj.emailOtpSentAt
+    delete userObj.emailOtpAttempts
+    delete userObj.emailOtpBlocked
 
     res.json({ 
       success: true, 
@@ -297,16 +324,22 @@ exports.resendOtp = async (req, res) => {
     } else if (phone) {
       user = await User.findOne({ phone })
     }
-    
+
+    // If record exists but OTP window expired, remove and ask client to start over.
+    if (user && !user.isEmailVerified && user.emailOtpExpires && new Date() > user.emailOtpExpires) {
+      await User.deleteOne({ _id: user._id })
+      return res.status(404).json({ message: 'OTP has expired; please register again.' })
+    }
+
     if (!user) return res.status(404).json({ message: 'User not found' })
 
-    if (user.isPhoneVerified) return res.status(400).json({ message: 'Account already verified' })
+    if (user.isEmailVerified) return res.status(400).json({ message: 'Account already verified' })
 
     // 60 second cooldown between OTP requests
     const now = Date.now()
     const cooldownMs = 60 * 1000
-    if (user.phoneOtpSentAt && now - new Date(user.phoneOtpSentAt).getTime() < cooldownMs) {
-      const secondsRemaining = Math.ceil((cooldownMs - (now - new Date(user.phoneOtpSentAt).getTime())) / 1000)
+    if (user.emailOtpSentAt && now - new Date(user.emailOtpSentAt).getTime() < cooldownMs) {
+      const secondsRemaining = Math.ceil((cooldownMs - (now - new Date(user.emailOtpSentAt).getTime())) / 1000)
       return res.status(429).json({ message: `OTP recently sent. Please wait ${secondsRemaining} seconds before requesting a new OTP.` })
     }
 
@@ -322,9 +355,9 @@ exports.resendOtp = async (req, res) => {
     }
 
     // Store OTP and track request time
-    user.phoneOtp = otp
-    user.phoneOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
-    user.phoneOtpSentAt = new Date()
+    user.emailOtp = otp
+    user.emailOtpExpires = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+    user.emailOtpSentAt = new Date()
     await user.save()
 
     res.json({ 

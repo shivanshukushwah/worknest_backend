@@ -69,7 +69,10 @@ const updateProfile = async (req, res) => {
 // @access  Private
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password -fcmToken")
+    // hide sensitive OTP fields as well as password/fcmToken when exposing profile
+    const user = await User.findById(req.params.id).select(
+      "-password -fcmToken -emailOtp -emailOtpHash -emailOtpExpires -emailOtpSentAt -emailOtpAttempts -emailOtpBlocked"
+    )
 
     if (!user) {
       return ResponseHelper.error(res, "User not found", 404)

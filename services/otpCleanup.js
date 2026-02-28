@@ -8,11 +8,19 @@ function startOtpCleanup(intervalMs = 60 * 1000) {
   intervalId = setInterval(async () => {
     try {
       const now = new Date()
+      // delete any unverified user whose OTP window has passed.  The TTL index
+      // will also remove stale docs, but explicitly deleting here ensures the
+      // user can immediately re-register and prevents the cleanup job from
+      // accidentally wiping the expiry field (which would disable the TTL).
+      await User.deleteMany({ emailOtpExpires: { $lte: now }, isEmailVerified: false })
+
+      // (legacy behaviour) any verified account accidentally left with a
+      // stale otp-related field will have those removed for hygiene.
       await User.updateMany(
-        { phoneOtpExpires: { $lte: now } },
+        { emailOtpExpires: { $exists: true }, isEmailVerified: true },
         {
-          $unset: { phoneOtpHash: "", phoneOtp: "" },
-          $set: { phoneOtpAttempts: 0, phoneOtpBlocked: false, phoneOtpExpires: null, phoneOtpSentAt: null },
+          $unset: { emailOtpHash: "", emailOtp: "", emailOtpExpires: "", emailOtpSentAt: "" },
+          $set: { emailOtpAttempts: 0, emailOtpBlocked: false },
         }
       )
     } catch (err) {

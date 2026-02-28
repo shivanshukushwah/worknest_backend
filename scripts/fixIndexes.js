@@ -37,6 +37,10 @@ const mongoose = require('mongoose')
     await User.collection.createIndex({ phone: 1, role: 1 }, { unique: true, sparse: true })
     console.log('✅ Created phone_1_role_1 compound unique index')
 
+    // TTL index to automatically remove unverified accounts once OTP expires
+    await User.collection.createIndex({ emailOtpExpires: 1 }, { expireAfterSeconds: 0 })
+    console.log('✅ Created TTL index on emailOtpExpires')
+
     console.log('\n📋 New indexes:')
     const newIndexes = await User.collection.getIndexes()
     Object.entries(newIndexes).forEach(([name, spec]) => {

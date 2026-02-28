@@ -36,7 +36,7 @@ All requirements implemented and tested:
 **Register Endpoint:**
 ```javascript
 exports.register = async (req, res)
-// Creates user (isPhoneVerified = false)
+// Creates user (isEmailVerified = false)
 // Sends OTP via Twilio
 // Returns userId (NOT otp) in response
 ```
@@ -118,7 +118,7 @@ Response (200):
     "name": "John Doe",
     "email": "john@example.com",
     "role": "student",
-    "isPhoneVerified": true
+    "isEmailVerified": true
   }
 }
 ```
@@ -295,8 +295,8 @@ PORT=5000
 - All security handled locally
 
 ### After (Twilio Verify)
-- Only stores: `isPhoneVerified` (true/false)
-- Only stores: `phoneOtpSentAt` (for rate limiting)
+- Only stores: `isEmailVerified` (true/false)
+- Only stores: `emailOtpSentAt` (for rate limiting)
 - Twilio handles OTP generation & security
 - Simplified database schema
 - Better security posture

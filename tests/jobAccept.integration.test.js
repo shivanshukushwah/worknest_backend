@@ -29,7 +29,7 @@ beforeEach(async () => {
 
 test('accepting applications closes job when positionsRequired reached', async () => {
   // Create employer and students
-  const employer = await User.create({ name: 'Emp', email: 'emp@example.com', password: 'hashed', role: 'employer', phone: '+911111111111', isPhoneVerified: true })
+  const employer = await User.create({ name: 'Emp', email: 'emp@example.com', password: 'hashed', role: 'employer', phone: '+911111111111', isEmailVerified: true })
   const s1 = await User.create({ name: 'S1', email: 's1@example.com', password: 'h', role: 'student' })
   const s2 = await User.create({ name: 'S2', email: 's2@example.com', password: 'h', role: 'student' })
   const s3 = await User.create({ name: 'S3', email: 's3@example.com', password: 'h', role: 'student' })
@@ -63,7 +63,7 @@ test('accepting applications closes job when positionsRequired reached', async (
 })
 
 test('student accepts assignment -> job becomes in_progress and can submit work', async () => {
-  const employer = await User.create({ name: 'Emp2', email: 'emp2@example.com', password: 'hashed', role: 'employer', phone: '+911111111112', isPhoneVerified: true })
+  const employer = await User.create({ name: 'Emp2', email: 'emp2@example.com', password: 'hashed', role: 'employer', phone: '+911111111112', isEmailVerified: true })
   const student = await User.create({ name: 'Stu', email: 'stu@example.com', password: 'h', role: 'student' })
   const tokenEmp = jwt.sign({ id: employer._id, email: employer.email, role: employer.role }, process.env.JWT_SECRET)
   const tokenStu = jwt.sign({ id: student._id, email: student.email, role: student.role }, process.env.JWT_SECRET)
