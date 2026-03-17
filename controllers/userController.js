@@ -25,6 +25,21 @@ const updateProfile = async (req, res) => {
     delete updateData.isVerified
     delete updateData.isActive
 
+    // Handle legacy field mappings for employers (similar to register)
+    if (req.user.role === 'employer') {
+      if (updateData.businessCity || updateData.businessLocation) {
+        updateData.businessAddress = updateData.businessAddress || {}
+        if (updateData.businessCity) {
+          updateData.businessAddress.city = updateData.businessCity
+          delete updateData.businessCity // remove legacy field
+        }
+        if (updateData.businessLocation) {
+          updateData.businessAddress.street = updateData.businessLocation
+          delete updateData.businessLocation // remove legacy field
+        }
+      }
+    }
+
     // Handle avatar upload if provided
     if (req.file) {
       try {

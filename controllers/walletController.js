@@ -25,42 +25,6 @@ const getWallet = async (req, res) => {
   }
 }
 
-// @desc    Create a new wallet for the authenticated user
-// @route   POST /api/wallet
-// @access  Private
-const createWallet = async (req, res) => {
-  try {
-    // Ensure user has completed profile before creating wallet
-    const user = await User.findById(req.user.id).select('phone isEmailVerified role email businessName businessAddress skills education age location')
-    if (!user) {
-      return ResponseHelper.error(res, "User not found", 404)
-    }
-
-    // Check email verification explicitly (403 Forbidden)
-    if (!user.isEmailVerified) {
-      return ResponseHelper.error(res, "Email not verified. Please verify your email first.", 403)
-    }
-
-    const { validateProfileCompletion, getMissingFieldsMessage } = require('../services/profileValidation')
-    const profileValidation = validateProfileCompletion(user)
-    if (!profileValidation.isComplete) {
-      const msg = getMissingFieldsMessage(profileValidation.missingFields)
-      return ResponseHelper.error(res, msg, 400)
-    }
-
-    const existing = await Wallet.findOne({ user: req.user.id })
-    if (existing) {
-      return ResponseHelper.success(res, existing, "Wallet already exists")
-    }
-
-    const wallet = await Wallet.create({ user: req.user.id })
-    ResponseHelper.success(res, wallet, "Wallet created successfully", 201)
-  } catch (error) {
-    console.error("Create wallet error:", error)
-    ResponseHelper.error(res, "Server error", 500)
-  }
-}
-
 // @desc    Get transaction history
 // @route   GET /api/wallet/transactions
 // @access  Private
@@ -342,7 +306,6 @@ const reconcileWallet = async (req, res) => {
 
 module.exports = {
   getWallet,
-  createWallet,
   getTransactions,
   getWalletStats,
   withdraw,

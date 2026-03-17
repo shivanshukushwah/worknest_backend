@@ -1,5 +1,5 @@
 const express = require("express")
-const { getWallet, createWallet, withdraw, getTransactions, getWalletStats, explainWallet, reconcileWallet } = require("../controllers/walletController")
+const { getWallet, withdraw, getTransactions, getWalletStats, explainWallet, reconcileWallet } = require("../controllers/walletController")
 const { auth, authorize } = require("../middleware/auth")
 
 const router = express.Router()
@@ -8,7 +8,6 @@ const router = express.Router()
 router.use(auth)
 
 router.get("/", getWallet)
-router.post("/", createWallet)
 router.post("/withdraw", withdraw)
 router.get("/transactions", getTransactions)
 router.get("/stats", getWalletStats)

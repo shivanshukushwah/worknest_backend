@@ -286,16 +286,12 @@ exports.verifyOtp = async (req, res) => {
 
     await user.save()
 
-    // After verification, attempt to auto-create wallet if profile is complete
+    // After verification, auto-create wallet for all users
     try {
       const Wallet = require('../models/Wallet')
-      const { validateProfileCompletion } = require('../services/profileValidation')
-      const profileValidation = validateProfileCompletion(user)
-      if (profileValidation.isComplete) {
-        const existingWallet = await Wallet.findOne({ user: user._id })
-        if (!existingWallet) {
-          await Wallet.create({ user: user._id })
-        }
+      const existingWallet = await Wallet.findOne({ user: user._id })
+      if (!existingWallet) {
+        await Wallet.create({ user: user._id })
       }
     } catch (e) {
       console.error('Auto-create wallet after verification failed:', e)
