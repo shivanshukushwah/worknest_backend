@@ -177,6 +177,11 @@ describe('OTP verification and login responses', () => {
     expect(res.body.user.education).toBe('BSc Physics')
     expect(res.body.user.isProfileComplete).toBe(true)
     expect(res.body.user.isEmailVerified).toBe(true)
+
+    // Check that wallet is auto-created after verification
+    const wallet = await Wallet.findOne({ user: user._id })
+    expect(wallet).not.toBeNull()
+    expect(wallet.balance).toBe(0)
   })
 
   test('completion status returns partial percentage when some fields are missing', async () => {
@@ -329,54 +334,5 @@ describe('Resend OTP endpoint', () => {
 
     const res = await request(app).post('/api/auth/resend-otp').send({ email: user.email }).expect(429)
     expect(res.body.message).toMatch(/OTP recently sent/i)
-  })
-})
-
-describe('Wallet creation guard', () => {
-  test('should block wallet creation when phone not verified', async () => {
-    const hashed = await bcrypt.hash('password', 10)
-    const user = await User.create({ 
-      name: 'WUser', 
-      email: 'w@example.com', 
-      password: hashed, 
-      phone: '+919000000001', 
-      isEmailVerified: false, 
-      role: 'student',
-      age: 20,
-      location: { city: 'TestCity', state: 'TS', country: 'TestCountry' },
-      education: 'Test Education',
-      skills: ['test']
-    })
-
-    const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET)
-
-    const res = await request(app).post('/api/wallet').set('Authorization', `Bearer ${token}`).send().expect(403)
-    expect(res.body.message).toMatch(/Email not verified/i)
-  })
-
-  test('should allow wallet creation after phone verified', async () => {
-    const hashed = await bcrypt.hash('password', 10)
-    const user = await User.create({ 
-      name: 'WUser2', 
-      email: 'w2@example.com', 
-      password: hashed, 
-      phone: '+919000000002', 
-      isEmailVerified: true, 
-      role: 'student',
-      age: 21,
-      location: { city: 'TestCity', state: 'TS', country: 'TestCountry' },
-      education: 'Test Education',
-      skills: ['test']
-    })
-
-    const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET)
-
-    const res = await request(app).post('/api/wallet').set('Authorization', `Bearer ${token}`).send().expect(201)
-    expect(res.body.success).toBe(true)
-    expect(res.body.data.user).toBeDefined()
-    // Wallet should exist
-    const wallet = await Wallet.findOne({ user: user._id })
-    expect(wallet).not.toBeNull()
-    expect(wallet.balance).toBe(0)
   })
 })

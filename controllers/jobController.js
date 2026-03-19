@@ -10,9 +10,9 @@ const createJob = async (req, res) => {
   console.log("CREATE JOB body:", req.body) // debug
 
   try {
-    const { title, description, category, budget, duration, submissionRequiresFiles = false, jobType = "offline", positionsRequired = 1, shortlistMultiplier = 3, shortlistWindowHours = 3, location } = req.body
+    const { title, description, budget, duration, jobType = "offline", positionsRequired = 1, applicationDeadlineHours = 3, location } = req.body
 
-    if (!title || !description || !category || !budget || !duration) {
+    if (!title || !description || !budget || !duration) {
       return res.status(400).json({ success: false, message: "Missing required fields - duration required" })
     }
 
@@ -36,26 +36,25 @@ const createJob = async (req, res) => {
 
     // coerce numeric fields and enforce sensible defaults
     const positionsRequiredNum = Math.max(1, parseInt(positionsRequired, 10) || 1)
-    const shortlistWindowHoursNum = Math.max(1, parseInt(shortlistWindowHours, 10) || 3)
+    const applicationDeadlineHoursNum = Math.max(1, parseInt(applicationDeadlineHours, 10) || 3)
 
-    // If online job, ensure the employer selected at least 1 hour for shortlisting
-    if (String(jobType) === 'online' && shortlistWindowHoursNum < 1) {
-      return res.status(400).json({ success: false, message: 'shortlistWindowHours must be at least 1 hour for online jobs' })
+    // If online job, ensure the employer selected at least 1 hour for application deadline
+    if (String(jobType) === 'online' && applicationDeadlineHoursNum < 1) {
+      return res.status(400).json({ success: false, message: 'applicationDeadlineHours must be at least 1 hour for online jobs' })
     }
 
     const jobData = {
       title,
       description,
-      category,
       budget,
       duration: String(duration).trim(),
       employer: employerId,
       postedBy: employerId,
-      submissionRequiresFiles,
       jobType,
       positionsRequired: positionsRequiredNum,
-      shortlistMultiplier,
-      shortlistWindowHours: shortlistWindowHoursNum,
+      shortlistMultiplier: 3,
+      shortlistWindowHours: applicationDeadlineHoursNum,
+      submissionRequiresFiles: false,
     }
     // Add location for offline jobs
     if (jobType === 'offline' && location) {
@@ -68,7 +67,7 @@ const createJob = async (req, res) => {
 
     // Set shortlist window end time for online jobs
     if (jobType === 'online') {
-      jobData.shortlistWindowEndsAt = new Date(Date.now() + shortlistWindowHoursNum * 60 * 60 * 1000)
+      jobData.shortlistWindowEndsAt = new Date(Date.now() + applicationDeadlineHoursNum * 60 * 60 * 1000)
     }
 
     const job = await Job.create(jobData)
