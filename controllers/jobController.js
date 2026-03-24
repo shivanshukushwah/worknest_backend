@@ -10,14 +10,14 @@ const createJob = async (req, res) => {
   console.log("CREATE JOB body:", req.body) // debug
 
   try {
-    const { title, description, budget, duration, jobType = "offline", positionsRequired = 1, applicationDeadlineHours = 3, location } = req.body
+    const { title, description, budget, duration, category, jobType = "offline", positionsRequired = 1, applicationDeadlineHours = 3, location } = req.body
 
-    if (!title || !description || !budget || !duration) {
-      return res.status(400).json({ success: false, message: "Missing required fields - duration required" })
+    if (!title || !description || !budget || !duration || !category) {
+      return res.status(400).json({ success: false, message: "Missing required fields: title, description, budget, duration, category" })
     }
 
     // Offline jobs require location
-    if (jobType === 'offline' && !location) {
+    if (jobType === 'offline' && (!location || !location.city || !location.state)) {
       return res.status(400).json({ success: false, message: "Location (city, state) is required for offline jobs" })
     }
 
@@ -46,6 +46,7 @@ const createJob = async (req, res) => {
     const jobData = {
       title,
       description,
+      category,
       budget,
       duration: String(duration).trim(),
       employer: employerId,
@@ -75,6 +76,10 @@ const createJob = async (req, res) => {
     return res.status(201).json({ success: true, data: job })
   } catch (err) {
     console.error("Create job error:", err)
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors || {}).map(e => e.message).filter(Boolean)
+      return res.status(400).json({ success: false, message: messages.join('; ') || 'Validation failed' })
+    }
     return res.status(500).json({ success: false, message: "Server error" })
   }
 }
