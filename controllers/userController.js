@@ -25,18 +25,24 @@ const updateProfile = async (req, res) => {
     delete updateData.isVerified
     delete updateData.isActive
 
-    // Handle legacy field mappings for employers (similar to register)
+    // Handle business address for employers
     if (req.user.role === 'employer') {
-      if (updateData.businessCity || updateData.businessLocation) {
+      if (updateData.businessLocation) {
         updateData.businessAddress = updateData.businessAddress || {}
-        if (updateData.businessCity) {
-          updateData.businessAddress.city = updateData.businessCity
-          delete updateData.businessCity // remove legacy field
-        }
-        if (updateData.businessLocation) {
+        if (typeof updateData.businessLocation === 'object') {
+          updateData.businessAddress.city = updateData.businessLocation.city
+          updateData.businessAddress.state = updateData.businessLocation.state
+        } else {
+          // legacy string
           updateData.businessAddress.street = updateData.businessLocation
-          delete updateData.businessLocation // remove legacy field
         }
+        delete updateData.businessLocation
+      }
+      // Handle legacy businessCity
+      if (updateData.businessCity) {
+        updateData.businessAddress = updateData.businessAddress || {}
+        updateData.businessAddress.city = updateData.businessCity
+        delete updateData.businessCity
       }
     }
 

@@ -98,8 +98,15 @@ const validateSignup = (data) => {
     }),
     businessLocation: Joi.when("role", {
       is: "employer",
-      then: Joi.string().min(2).max(200).required().messages({
-        "any.required": "Business location is required for employers",
+      then: Joi.object({
+        city: Joi.string().min(2).max(100).required().messages({
+          "any.required": "Business city is required for employers",
+        }),
+        state: Joi.string().min(2).max(100).required().messages({
+          "any.required": "Business state is required for employers",
+        }),
+      }).required().messages({
+        "any.required": "Business location (city, state) is required for employers",
       }),
       otherwise: Joi.forbidden(),
     }),

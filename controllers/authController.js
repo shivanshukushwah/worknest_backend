@@ -26,7 +26,7 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: error.details[0].message })
     }
 
-    const { name, email, password, confirmPassword, role, phone, location, businessName, businessType, businessLocation, businessCity, age, skills, education, userType } = req.body
+    const { name, email, password, confirmPassword, role, phone, location, businessName, businessType, businessLocation, age, skills, education, userType } = req.body
 
     // Verify passwords match (additional safeguard, though Joi should catch this)
     if (password !== confirmPassword) {
@@ -105,10 +105,10 @@ exports.register = async (req, res) => {
     if (role === 'employer') {
       userData.businessName = businessName
       userData.businessType = businessType
-      // Map legacy businessLocation/businessCity into structured businessAddress
-      userData.businessAddress = {}
-      if (businessLocation) userData.businessAddress.street = businessLocation
-      if (businessCity) userData.businessAddress.city = businessCity
+      userData.businessAddress = {
+        city: businessLocation.city,
+        state: businessLocation.state,
+      }
     }
 
     // Default userType based on role if client did not provide one.
