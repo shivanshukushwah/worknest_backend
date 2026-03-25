@@ -1,5 +1,7 @@
 const User = require("../models/User")
+const Job = require("../models/Job")
 const ResponseHelper = require("../utils/responseHelper")
+const { JOB_STATUS } = require("../utils/constants")
 const { validateProfileUpdate } = require("../validators/userValidator")
 const { validateProfileCompletion } = require("../services/profileValidation")
 const cloudinary = require("../config/cloudinary")
@@ -112,6 +114,19 @@ const getUserById = async (req, res) => {
       totalFields: profileValidation.totalFields,
       filledFields: profileValidation.filledFields,
       percentage: profileValidation.percentage,
+    }
+
+    if (user.role === 'employer') {
+      const jobQuery = { employer: user._id }
+      const totalJobsPosted = await Job.countDocuments(jobQuery)
+      const activeJobs = await Job.countDocuments({ ...jobQuery, status: { $in: [JOB_STATUS.OPEN, JOB_STATUS.IN_PROGRESS] } })
+      const completedJobs = await Job.countDocuments({ ...jobQuery, status: { $in: [JOB_STATUS.COMPLETED, JOB_STATUS.PAID] } })
+
+      responseData.jobStats = { totalJobsPosted, activeJobs, completedJobs }
+
+      if (req.query.includeJobs === 'true') {
+        responseData.jobs = await Job.find(jobQuery).sort({ createdAt: -1 }).lean()
+      }
     }
 
     ResponseHelper.success(res, responseData, "User profile retrieved successfully")

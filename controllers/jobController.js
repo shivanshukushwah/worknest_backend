@@ -3,6 +3,9 @@ const User = require("../models/User")
 const ResponseHelper = require("../utils/responseHelper")
 const { validateProfileCompletion, getMissingFieldsMessage } = require("../services/profileValidation")
 
+// Helper to tolerate both JWT payload shapes (id or _id)
+const getUserId = (user) => user?.id || user?._id
+
 // @desc    Create a new job
 // @route   POST /api/jobs
 // @access  Private (Employer only)
@@ -22,7 +25,7 @@ const createJob = async (req, res) => {
     }
 
     // ensure authenticated user available
-    const employerId = req.user?.id
+    const employerId = getUserId(req.user)
     if (!employerId) return res.status(401).json({ success: false, message: "Unauthorized" })
 
     // Check profile completeness before allowing job creation
@@ -89,7 +92,7 @@ const getJobs = async (req, res) => {
   try {
     const { mine } = req.query
     const query = {}
-    if (mine === "true" && req.user) query.employer = req.user.id
+    if (mine === "true" && req.user) query.employer = getUserId(req.user)
 
     const jobs = await Job.find(query).sort({ createdAt: -1 })
 
@@ -159,7 +162,8 @@ const getShortlistedCandidates = async (req, res) => {
 const getMyJobs = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
-    const jobs = await Job.find({ employer: req.user.id }).sort({ createdAt: -1 })
+    const employerId = getUserId(req.user)
+    const jobs = await Job.find({ employer: employerId }).sort({ createdAt: -1 })
     return res.json(jobs)
   } catch (err) {
     console.error("Get my jobs error:", err)

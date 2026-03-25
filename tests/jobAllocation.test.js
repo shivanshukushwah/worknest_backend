@@ -74,3 +74,32 @@ test('online job: require profileUrl and shortlist top N', async () => {
   const res = await request(app).put(`/api/jobs/${job._id}/applications/${nonShort._id}/accept`).set('Authorization', `Bearer ${tokenEmp}`).send()
   expect(res.statusCode).toBe(400)
 })
+
+test('employer can list own posted jobs and profile job stats', async () => {
+  const employer = await User.create({ name: 'Emp3', email: 'emp3@example.com', password: 'p', role: 'employer', phone: '+913' })
+  const tokenEmp = jwt.sign({ id: employer._id, email: employer.email, role: employer.role }, process.env.JWT_SECRET)
+
+  const createRes = await request(app).post('/api/jobs').set('Authorization', `Bearer ${tokenEmp}`).send({
+    title: 'Employer My Jobs',
+    description: 'desc',
+    category: 'test',
+    budget: 150,
+    duration: '2',
+    jobType: 'offline',
+    location: { city: 'Delhi', state: 'DL' },
+  }).expect(201)
+
+  expect(createRes.body.success).toBe(true)
+
+  const myJobsRes = await request(app).get('/api/jobs/my-jobs').set('Authorization', `Bearer ${tokenEmp}`).send().expect(200)
+  expect(Array.isArray(myJobsRes.body)).toBe(true)
+  expect(myJobsRes.body.length).toBe(1)
+  expect(myJobsRes.body[0].title).toBe('Employer My Jobs')
+
+  const profileRes = await request(app).get(`/api/users/${employer._id}?includeJobs=true`).set('Authorization', `Bearer ${tokenEmp}`).expect(200)
+  expect(profileRes.body.success).toBe(true)
+  expect(profileRes.body.data.jobStats).toBeDefined()
+  expect(profileRes.body.data.jobStats.totalJobsPosted).toBe(1)
+  expect(Array.isArray(profileRes.body.data.jobs)).toBe(true)
+  expect(profileRes.body.data.jobs[0].title).toBe('Employer My Jobs')
+})
