@@ -105,6 +105,47 @@ async function moveToEscrow(userId, amount, { session = null, description = 'Mov
   }
 }
 
+async function deductFunds(userId, amount, { session = null, description = 'Deduction', metadata = {} } = {}) {
+  // This deducts funds from wallet balance for various payments (job posting fees, etc.)
+  const ownSession = !session
+  if (ownSession) session = await mongoose.startSession()
+
+  try {
+    if (ownSession) await session.withTransaction(async () => {
+      await _deductFundsTx(userId, amount, { session, description, metadata })
+    })
+    else await _deductFundsTx(userId, amount, { session, description, metadata })
+
+    return true
+  } finally {
+    if (ownSession) session.endSession()
+  }
+}
+
+async function _deductFundsTx(userId, amount, { session, description, metadata }) {
+  const wallet = await Wallet.findOne({ user: userId }).session(session)
+  if (!wallet) throw new Error('Wallet not found')
+  if (wallet.balance < amount) throw new Error('Insufficient balance')
+
+  wallet.balance = Number((wallet.balance - amount).toFixed(2))
+  wallet.totalSpent = (wallet.totalSpent || 0) + amount
+  await wallet.save({ session })
+
+  const tx = await Transaction.create([
+    {
+      user: userId,
+      type: 'payment',
+      amount,
+      status: PAYMENT_STATUS.COMPLETED,
+      description,
+      metadata: metadata || {},
+      completedAt: new Date(),
+    },
+  ], { session })
+
+  return { wallet, transaction: tx[0] }
+}
+
 async function _moveToEscrowTx(userId, amount, { session, description, jobId }) {
   const wallet = await Wallet.findOne({ user: userId }).session(session)
   if (!wallet) throw new Error('Wallet not found')
@@ -242,5 +283,6 @@ module.exports = {
   addFunds,
   requestWithdrawal,
   moveToEscrow,
+  deductFunds,
   releaseFromEscrow,
 }

@@ -21,8 +21,12 @@ router.use(auth)
 router.post("/", authorize("employer"), createJob)
 router.get("/", getJobs)
 router.get("/my-jobs", getMyJobs)
+router.get("/employer/my-jobs", authorize("employer"), getMyJobs)
 router.get("/my-applications", authorize("student"), getMyApplications)
 router.get("/:id", getJobById)
+router.post("/:id/close", authorize("employer"), closeJob)
+router.delete("/:id", authorize("employer"), cancelJob)
+router.get("/:id/applications", authorize("employer", "admin"), getJobApplications)
 
 // Shortlisted candidates for a job (employer or admin)
 router.get('/:id/shortlisted', authorize('employer', 'admin'), async (req, res, next) => {
@@ -43,6 +47,7 @@ router.put('/:id/applications/:applicationId/reject', authorize("employer"), asy
   const { rejectApplication } = require('../controllers/jobController')
   return rejectApplication(req, res, next)
 })
+router.post("/:id/applications/:applicationId/shortlist", authorize("employer"), shortlistApplication)
 
 // Force inspect an application (employer or admin)
 router.post('/:id/applications/:applicationId/inspect', authorize(), async (req, res, next) => {

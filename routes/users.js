@@ -36,6 +36,16 @@ router.use(auth)
 router.put("/profile", upload.single("avatar"), updateProfile)
 router.get("/profile/completion-status", getProfileCompletionStatus)
 router.get("/stats", getUserStats)
+router.get("/employer/me", authorize("employer"), async (req, res) => {
+  const { getUserById } = require("../controllers/userController");
+  req.params.id = req.user.id;
+  return getUserById(req, res);
+});
+router.get("/student/me", authorize("student"), async (req, res) => {
+  const { getUserById } = require("../controllers/userController");
+  req.params.id = req.user.id;
+  return getUserById(req, res);
+});
 router.delete("/deactivate", deactivateAccount)
 
 // User discovery

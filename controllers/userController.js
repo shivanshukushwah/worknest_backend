@@ -123,6 +123,8 @@ const getUserById = async (req, res) => {
       const completedJobs = await Job.countDocuments({ ...jobQuery, status: { $in: [JOB_STATUS.COMPLETED, JOB_STATUS.PAID] } })
 
       responseData.jobStats = { totalJobsPosted, activeJobs, completedJobs }
+      responseData.activeJobsCount = activeJobs
+      responseData.totalJobsCount = totalJobsPosted
 
       if (req.query.includeJobs === 'true') {
         responseData.jobs = await Job.find(jobQuery).sort({ createdAt: -1 }).lean()

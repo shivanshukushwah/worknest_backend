@@ -1,3 +1,4 @@
+const mongoose = require("mongoose")
 const Job = require("../models/Job")
 const User = require("../models/User")
 const ResponseHelper = require("../utils/responseHelper")
@@ -52,8 +53,8 @@ const createJob = async (req, res) => {
       category,
       budget,
       duration: String(duration).trim(),
-      employer: employerId,
-      postedBy: employerId,
+      employer: new mongoose.Types.ObjectId(employerId),
+      postedBy: new mongoose.Types.ObjectId(employerId),
       jobType,
       positionsRequired: positionsRequiredNum,
       shortlistMultiplier: 3,
@@ -74,6 +75,7 @@ const createJob = async (req, res) => {
       jobData.shortlistWindowEndsAt = new Date(Date.now() + applicationDeadlineHoursNum * 60 * 60 * 1000)
     }
 
+    // Create the job
     const job = await Job.create(jobData)
 
     return res.status(201).json({ success: true, data: job })
@@ -90,38 +92,53 @@ const createJob = async (req, res) => {
 // @desc    Get list of jobs (optional ?mine=true)
 const getJobs = async (req, res) => {
   try {
-    const { mine } = req.query
-    const query = {}
-    if (mine === "true" && req.user) query.employer = getUserId(req.user)
+    const { mine, page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
 
-    const jobs = await Job.find(query).sort({ createdAt: -1 })
+    const query = {};
+    if (mine === "true" && req.user) query.employer = getUserId(req.user);
+
+    const total = await Job.countDocuments(query);
+    let jobs = await Job.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
 
     // Apply location-based filtering for workers viewing all jobs
     if (req.user && (req.user.role === 'worker' || req.user.role === 'student') && mine !== "true") {
-      const student = await User.findById(req.user.id)
+      const student = await User.findById(req.user.id);
       if (student && student.location) {
-        const { filterJobsByType } = require('../services/locationService')
-        const filteredJobs = filterJobsByType(jobs, student.location, 50) // 50km radius
-        return res.json(filteredJobs)
+        const { filterJobsByType } = require('../services/locationService');
+        jobs = filterJobsByType(jobs, student.location, 50); // 50km radius
       }
     }
 
-    return res.json(jobs)
+    return res.json({
+      success: true,
+      data: jobs,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (err) {
-    console.error("Get jobs error:", err)
-    return res.status(500).json({ success: false, message: "Server error" })
+    console.error("Get jobs error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 }
 
 // @desc    Get single job by id
 const getJobById = async (req, res) => {
   try {
-    const job = await Job.findById(req.params.id).populate("employer", "name businessName").lean()
-    if (!job) return res.status(404).json({ success: false, message: "Job not found" })
-    return res.json(job)
+    const job = await Job.findById(req.params.id).populate("employer", "name businessName").lean();
+    if (!job) return res.status(404).json({ success: false, message: "Job not found" });
+    return res.json({ success: true, data: job });
   } catch (err) {
-    console.error("Get job error:", err)
-    return res.status(500).json({ success: false, message: "Server error" })
+    console.error("Get job error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 }
 
@@ -132,26 +149,46 @@ const getShortlistedCandidates = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
     const { id } = req.params
-    // populate student basic info (name, phone)
-    const job = await Job.findById(id).populate('applications.student', 'name phone').lean()
+    const page = parseInt(req.query.page) || 1;
+    const limitNum = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limitNum;
+
+    const job = await Job.findById(id).populate('applications.student', 'name phone avatar skillScore').lean()
     if (!job) return res.status(404).json({ success: false, message: "Job not found" })
 
-    // only employer who posted the job or admin can view shortlisted list
     if (req.user.role !== 'admin' && String(job.employer) !== String(req.user.id)) {
-      return res.status(403).json({ success: false, message: "Forbidden: only employer or admin can view shortlisted candidates" })
+      return res.status(403).json({ success: false, message: "Forbidden" })
     }
 
-    const shortlisted = (job.applications || []).filter(a => a.shortlisted).map(a => ({
-      applicationId: a._id,
+    const shortlisted = (job.applications || []).filter(a => a.shortlisted);
+    const total = shortlisted.length;
+    const paginatedShortlist = shortlisted.slice(skip, skip + limitNum).map(a => ({
+      id: a._id,
+      jobId: id,
       studentId: a.student ? a.student._id : null,
-      name: a.student ? a.student.name : null,
-      phone: a.student ? a.student.phone : null,
+      status: a.status,
+      appliedAt: a.createdAt,
       coverLetter: a.coverLetter || '',
       evaluationScore: a.evaluationScore || 0,
-      createdAt: a.createdAt,
-    }))
+      student: {
+        id: a.student ? a.student._id : null,
+        name: a.student ? a.student.name : 'Unknown',
+        phone: a.student ? a.student.phone : null,
+        avatar: a.student ? a.student.avatar : null,
+        skillScore: a.student ? a.student.skillScore : 0
+      }
+    }));
 
-    return res.json({ success: true, shortlisted })
+    return res.json({ 
+      success: true, 
+      data: paginatedShortlist,
+      pagination: {
+        total,
+        page,
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum)
+      }
+    })
   } catch (err) {
     console.error('Get shortlisted candidates error:', err)
     return res.status(500).json({ success: false, message: 'Server error' })
@@ -161,13 +198,31 @@ const getShortlistedCandidates = async (req, res) => {
 // @desc    Get jobs posted by current employer
 const getMyJobs = async (req, res) => {
   try {
-    if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
-    const employerId = getUserId(req.user)
-    const jobs = await Job.find({ employer: employerId }).sort({ createdAt: -1 })
-    return res.json(jobs)
+    if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" });
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
+    
+    const employerId = new mongoose.Types.ObjectId(getUserId(req.user));
+    const total = await Job.countDocuments({ employer: employerId });
+    const jobs = await Job.find({ employer: employerId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+      
+    return res.json({
+      success: true,
+      data: jobs,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (err) {
-    console.error("Get my jobs error:", err)
-    return res.status(500).json({ success: false, message: "Server error" })
+    console.error("Get my jobs error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 }
 
@@ -776,8 +831,55 @@ const approveCompletion = async (req, res) => {
   }
 }
 
+// @desc    Close a job (stop new applications)
+// @route   POST /api/jobs/:id/close
+// @access  Private (Employer of job)
+const closeJob = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
+    const { id } = req.params
+
+    const job = await Job.findById(id)
+    if (!job) return res.status(404).json({ success: false, message: "Job not found" })
+
+    if (String(job.employer) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: "Forbidden" })
+    }
+
+    job.status = JOB_STATUS.CLOSED
+    job.closedAt = new Date()
+    await job.save()
+
+    return res.json({ success: true, data: job })
+  } catch (err) {
+    console.error('Close job error:', err)
+    return res.status(500).json({ success: false, message: 'Server error' })
+  }
+}
+
+// @desc    Cancel a job
+// @route   PUT /api/jobs/:id/cancel
+// @access  Private (Employer of job)
 const cancelJob = async (req, res) => {
-  return res.status(501).json({ success: false, message: "Not implemented" })
+  try {
+    if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
+    const { id } = req.params
+
+    const job = await Job.findById(id)
+    if (!job) return res.status(404).json({ success: false, message: "Job not found" })
+
+    if (String(job.employer) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: "Forbidden" })
+    }
+
+    job.status = JOB_STATUS.CANCELLED
+    await job.save()
+
+    return res.json({ success: true, data: job })
+  } catch (err) {
+    console.error('Cancel job error:', err)
+    return res.status(500).json({ success: false, message: 'Server error' })
+  }
 }
 
 // @desc    Get all applications by current student
@@ -820,12 +922,106 @@ const getMyApplications = async (req, res) => {
     }).filter(a => a !== null)
 
     // Sort by application date (newest first)
-    myApplications.sort((a, b) => new Date(b.appliedAt) - new Date(a.appliedAt))
+    myApplications.sort((a, b) => new Date(b.appliedAt) - new Date(a.appliedAt));
 
-    return res.json({ success: true, applications: myApplications })
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const total = myApplications.length;
+    const paginatedApps = myApplications.slice((page - 1) * limit, page * limit);
+
+    return res.json({
+      success: true,
+      data: paginatedApps,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    });
   } catch (err) {
-    console.error('Get my applications error:', err)
+    console.error('Get my applications error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+}
+
+// Employer manually shortlists an application
+const shortlistApplication = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
+    const { id, applicationId } = req.params
+
+    const job = await Job.findById(id)
+    if (!job) return res.status(404).json({ success: false, message: "Job not found" })
+
+    if (String(job.employer) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: "Forbidden" })
+    }
+
+    const application = job.applications.id(applicationId)
+    if (!application) return res.status(404).json({ success: false, message: "Application not found" })
+
+    application.shortlisted = true
+    await job.save()
+
+    return res.json({ success: true, application })
+  } catch (err) {
+    console.error('Shortlist application error:', err)
     return res.status(500).json({ success: false, message: 'Server error' })
+  }
+}
+
+// @desc    Get all applications for a specific job
+// @route   GET /api/jobs/:id/applications
+// @access  Private (Employer of job or Admin)
+const getJobApplications = async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
+    const { id } = req.params
+    const page = parseInt(req.query.page) || 1;
+    const limitNum = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limitNum;
+
+    const job = await Job.findById(id).populate('applications.student', 'name avatar skillScore phone').lean()
+    if (!job) return res.status(404).json({ success: false, message: "Job not found" })
+
+    if (req.user.role !== 'admin' && String(job.employer) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: "Forbidden" })
+    }
+
+    const applications = job.applications || [];
+    const total = applications.length;
+    const paginatedApps = applications.slice(skip, skip + limitNum).map(a => ({
+      id: a._id,
+      jobId: id,
+      studentId: a.student ? a.student._id : null,
+      status: a.status,
+      appliedAt: a.createdAt,
+      coverLetter: a.coverLetter || '',
+      profileUrl: a.profileUrl || '',
+      evaluationScore: a.evaluationScore || 0,
+      student: {
+        id: a.student ? a.student._id : null,
+        name: a.student ? a.student.name : 'Unknown',
+        avatar: a.student ? a.student.avatar : null,
+        skillScore: a.student ? a.student.skillScore : 0,
+        phone: a.student ? a.student.phone : null
+      }
+    }));
+
+    return res.json({
+      success: true,
+      data: paginatedApps,
+      pagination: {
+        total,
+        page,
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (err) {
+    console.error('Get job applications error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 }
 
@@ -836,6 +1032,8 @@ module.exports = {
   getShortlistedCandidates,
   getMyJobs,
   getMyApplications,
+  getJobApplications,
+  shortlistApplication,
   getJobSubmission,
   applyForJob,
   acceptApplication,
@@ -845,6 +1043,7 @@ module.exports = {
   rejectApplication,
   penalizeNoShow,
   forceInspectApplication,
+  closeJob,
   cancelJob,
 };
 
