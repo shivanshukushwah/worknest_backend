@@ -9,6 +9,16 @@ const {
   getMyJobs,
   getMyApplications,
   cancelJob,
+  closeJob,
+  getShortlistedCandidates,
+  getJobApplications,
+  shortlistApplication,
+  getJobSubmission,
+  rejectApplication,
+  forceInspectApplication,
+  penalizeNoShow,
+  acceptAssignment,
+  approveCompletion,
 } = require("../controllers/jobController")
 const { auth, authorize } = require("../middleware/auth")
 
@@ -29,49 +39,26 @@ router.delete("/:id", authorize("employer"), cancelJob)
 router.get("/:id/applications", authorize("employer", "admin"), getJobApplications)
 
 // Shortlisted candidates for a job (employer or admin)
-router.get('/:id/shortlisted', authorize('employer', 'admin'), async (req, res, next) => {
-  const { getShortlistedCandidates } = require('../controllers/jobController')
-  return getShortlistedCandidates(req, res, next)
-})
+router.get('/:id/shortlisted', authorize('employer', 'admin'), getShortlistedCandidates)
 
 // Get submission for a job (employer, assigned student, or admin)
-router.get('/:id/submission', authorize('employer', 'student', 'admin'), async (req, res, next) => {
-  const { getJobSubmission } = require('../controllers/jobController')
-  return getJobSubmission(req, res, next)
-})
+router.get('/:id/submission', authorize('employer', 'student', 'admin'), getJobSubmission)
 
 // Job applications
 router.post("/:id/apply", authorize("student"), applyForJob)
 router.put("/:id/applications/:applicationId/accept", authorize("employer"), acceptApplication)
-router.put('/:id/applications/:applicationId/reject', authorize("employer"), async (req, res, next) => {
-  const { rejectApplication } = require('../controllers/jobController')
-  return rejectApplication(req, res, next)
-})
+router.put('/:id/applications/:applicationId/reject', authorize("employer"), rejectApplication)
 router.post("/:id/applications/:applicationId/shortlist", authorize("employer"), shortlistApplication)
 
 // Force inspect an application (employer or admin)
-router.post('/:id/applications/:applicationId/inspect', authorize(), async (req, res, next) => {
-  const { forceInspectApplication } = require('../controllers/jobController')
-  return forceInspectApplication(req, res, next)
-})
-router.post('/:id/penalize/:studentId', authorize("employer"), async (req, res, next) => {
-  const { penalizeNoShow } = require('../controllers/jobController')
-  return penalizeNoShow(req, res, next)
-})
+router.post('/:id/applications/:applicationId/inspect', authorize(), forceInspectApplication)
+router.post('/:id/penalize/:studentId', authorize("employer"), penalizeNoShow)
+
 // Assignment / workflow
-router.put("/:id/accept-assignment", authorize("student"), async (req, res, next) => {
-  // lightweight wrapper to call controller method - moved inline to avoid extra import
-  const { acceptAssignment } = require("../controllers/jobController")
-  return acceptAssignment(req, res, next)
-})
+router.put("/:id/accept-assignment", authorize("student"), acceptAssignment)
 
 router.put("/:id/submit-work", authorize("student"), submitWork)
-router.put("/:id/approve-completion", authorize("employer"), async (req, res, next) => {
-  // Reload controller so code changes are applied without server restart
-  try { delete require.cache[require.resolve("../controllers/jobController")] } catch (e) {}
-  const { approveCompletion } = require("../controllers/jobController")
-  return approveCompletion(req, res, next)
-})
+router.put("/:id/approve-completion", authorize("employer"), approveCompletion)
 
 router.put("/:id/cancel", authorize("employer"), cancelJob)
 
