@@ -170,6 +170,46 @@ async function _moveToEscrowTx(userId, amount, { session, description, jobId }) 
   return { wallet, transaction: tx[0] }
 }
 
+async function refundFromEscrow(userId, amount, { session = null, description = 'Refund from escrow', jobId = null } = {}) {
+  const ownSession = !session
+  if (ownSession) session = await mongoose.startSession()
+
+  try {
+    if (ownSession) await session.withTransaction(async () => {
+      await _refundFromEscrowTx(userId, amount, { session, description, jobId })
+    })
+    else await _refundFromEscrowTx(userId, amount, { session, description, jobId })
+
+    return true
+  } finally {
+    if (ownSession) session.endSession()
+  }
+}
+
+async function _refundFromEscrowTx(userId, amount, { session, description, jobId }) {
+  const wallet = await Wallet.findOne({ user: userId }).session(session)
+  if (!wallet) throw new Error('Wallet not found')
+  if (wallet.escrowBalance < amount) throw new Error('Insufficient escrow balance for refund')
+
+  wallet.escrowBalance = Number((wallet.escrowBalance - amount).toFixed(2))
+  wallet.balance = Number((wallet.balance + amount).toFixed(2))
+  await wallet.save({ session })
+
+  const tx = await Transaction.create([
+    {
+      user: userId,
+      type: 'refund',
+      amount,
+      status: PAYMENT_STATUS.COMPLETED,
+      description,
+      job: jobId,
+      completedAt: new Date(),
+    },
+  ], { session })
+
+  return { wallet, transaction: tx[0] }
+}
+
 async function releaseFromEscrow(job, { session = null } = {}) {
   // job should be a populated Job document with assignedStudent and employer
   const ownSession = !session
@@ -284,5 +324,6 @@ module.exports = {
   requestWithdrawal,
   moveToEscrow,
   deductFunds,
+  refundFromEscrow,
   releaseFromEscrow,
 }

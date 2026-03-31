@@ -1,8 +1,11 @@
 const mongoose = require("mongoose")
 const Job = require("../models/Job")
 const User = require("../models/User")
+const Wallet = require("../models/Wallet")
+const WalletService = require("../services/walletService")
 const ResponseHelper = require("../utils/responseHelper")
 const { validateProfileCompletion, getMissingFieldsMessage } = require("../services/profileValidation")
+const { JOB_STATUS } = require("../utils/constants")
 
 // Helper to tolerate both JWT payload shapes (id or _id)
 const getUserId = (user) => user?.id || user?._id
@@ -47,11 +50,26 @@ const createJob = async (req, res) => {
       return res.status(400).json({ success: false, message: 'applicationDeadlineHours must be at least 1 hour for online jobs' })
     }
 
+    // Salary should be locked in escrow at posting
+    const budgetNum = Number(budget)
+    if (Number.isNaN(budgetNum) || budgetNum <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid budget amount' })
+    }
+
+    const employerWallet = await Wallet.findOne({ user: employerId })
+    if (!employerWallet) {
+      return res.status(400).json({ success: false, message: 'Employer wallet not found. Please create and load wallet first.' })
+    }
+
+    if (employerWallet.balance < budgetNum) {
+      return res.status(400).json({ success: false, message: `Insufficient wallet balance. Please add ₹${(budgetNum - employerWallet.balance).toFixed(2)} more.` })
+    }
+
     const jobData = {
       title,
       description,
       category,
-      budget,
+      budget: budgetNum,
       duration: String(duration).trim(),
       employer: new mongoose.Types.ObjectId(employerId),
       postedBy: new mongoose.Types.ObjectId(employerId),
@@ -60,6 +78,8 @@ const createJob = async (req, res) => {
       shortlistMultiplier: 3,
       shortlistWindowHours: applicationDeadlineHoursNum,
       submissionRequiresFiles: false,
+      escrowAmount: budgetNum,
+      status: JOB_STATUS.OPEN,
     }
     // Add location for offline jobs
     if (jobType === 'offline' && location) {
@@ -75,8 +95,25 @@ const createJob = async (req, res) => {
       jobData.shortlistWindowEndsAt = new Date(Date.now() + applicationDeadlineHoursNum * 60 * 60 * 1000)
     }
 
-    // Create the job
-    const job = await Job.create(jobData)
+    let job = null
+    const session = await mongoose.startSession()
+    try {
+      await session.withTransaction(async () => {
+        const created = await Job.create([jobData], { session })
+        job = created[0]
+
+        await WalletService.moveToEscrow(employerId, budgetNum, {
+          description: `Escrow lock for job posting: ${title}`,
+          jobId: job._id,
+          session,
+        })
+
+        job.escrowAmount = budgetNum
+        await job.save({ session })
+      })
+    } finally {
+      session.endSession()
+    }
 
     return res.status(201).json({ success: true, data: job })
   } catch (err) {
@@ -385,7 +422,6 @@ const applyForJob = async (req, res) => {
 }
 
 const NotificationService = require("../services/notificationService")
-const { JOB_STATUS } = require("../utils/constants")
 
 const acceptApplication = async (req, res) => {
   try {
@@ -792,6 +828,16 @@ const approveCompletion = async (req, res) => {
     }
 
     // Optionally notify student that employer approved and they can expect payout
+    let releaseResult = null
+    if (job.studentApproved && !job.paymentReleased && (job.escrowAmount || job.budget) > 0) {
+      try {
+        releaseResult = await WalletService.releaseFromEscrow(job)
+      } catch (releaseErr) {
+        console.error("Auto-release after employer approval failed:", releaseErr)
+        return res.status(500).json({ success: false, message: "Work approved but payout release failed", error: releaseErr.message })
+      }
+    }
+
     try {
       await NotificationService.createAndSendNotification({
         recipientId: job.assignedStudent,
@@ -824,7 +870,9 @@ const approveCompletion = async (req, res) => {
     }
 
     console.log('approveCompletion: returning trimmed job summary for job', String(job._id))
-    return res.json({ success: true, submission: job.submission || null, job: jobSummary, debug: 'TRIMMED_APPROVE' })
+    const response = { success: true, submission: job.submission || null, job: jobSummary, debug: 'TRIMMED_APPROVE' }
+    if (releaseResult) response.releaseResult = releaseResult
+    return res.json(response)
   } catch (err) {
     console.error("Approve completion error:", err)
     return res.status(500).json({ success: false, message: "Server error" })
@@ -870,6 +918,19 @@ const cancelJob = async (req, res) => {
 
     if (String(job.employer) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: "Forbidden" })
+    }
+
+    if (job.escrowAmount > 0 && !job.paymentReleased) {
+      try {
+        await WalletService.refundFromEscrow(job.employer, job.escrowAmount, {
+          description: `Refund for cancelled job: ${job.title}`,
+          jobId: job._id,
+        })
+        job.escrowAmount = 0
+      } catch (refundErr) {
+        console.error('Refund on job cancel failed:', refundErr)
+        return res.status(500).json({ success: false, message: 'Job cancel failed: refund to employer could not be completed.' })
+      }
     }
 
     job.status = JOB_STATUS.CANCELLED
