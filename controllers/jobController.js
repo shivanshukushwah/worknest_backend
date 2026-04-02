@@ -10,6 +10,8 @@ const { JOB_STATUS } = require("../utils/constants")
 // Helper to tolerate both JWT payload shapes (id or _id)
 const getUserId = (user) => user?.id || user?._id
 
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(String(id))
+
 // @desc    Create a new job
 // @route   POST /api/jobs
 // @access  Private (Employer only)
@@ -170,8 +172,18 @@ const getJobs = async (req, res) => {
 // @desc    Get single job by id
 const getJobById = async (req, res) => {
   try {
-    const job = await Job.findById(req.params.id).populate("employer", "name businessName").lean();
+    const { id } = req.params
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid job ID" })
+    }
+
+    const job = await Job.findById(id).populate("employer", "name businessName").lean();
     if (!job) return res.status(404).json({ success: false, message: "Job not found" });
+
+    // Ensure at least default form for fields expected by UI
+    job.applications = Array.isArray(job.applications) ? job.applications : []
+    job.location = job.location || null
+
     return res.json({ success: true, data: job });
   } catch (err) {
     console.error("Get job error:", err);
@@ -270,6 +282,9 @@ const getJobSubmission = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
     const { id } = req.params
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid job ID" })
+    }
     const job = await Job.findById(id).lean()
     if (!job) return res.status(404).json({ success: false, message: "Job not found" })
 
@@ -932,6 +947,9 @@ const cancelJob = async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, message: "Unauthorized" })
     const { id } = req.params
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Invalid job ID" })
+    }
 
     const job = await Job.findById(id)
     if (!job) return res.status(404).json({ success: false, message: "Job not found" })

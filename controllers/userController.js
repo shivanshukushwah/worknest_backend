@@ -127,7 +127,11 @@ const getUserById = async (req, res) => {
       responseData.totalJobsCount = totalJobsPosted
 
       if (req.query.includeJobs === 'true') {
-        responseData.jobs = await Job.find(jobQuery).sort({ createdAt: -1 }).lean()
+        if (user.role === 'employer') {
+          responseData.jobs = await Job.find(jobQuery).sort({ createdAt: -1 }).lean()
+        } else {
+          responseData.jobs = []
+        }
       }
     }
 

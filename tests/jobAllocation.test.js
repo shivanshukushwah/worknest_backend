@@ -103,3 +103,14 @@ test('employer can list own posted jobs and profile job stats', async () => {
   expect(Array.isArray(profileRes.body.data.jobs)).toBe(true)
   expect(profileRes.body.data.jobs[0].title).toBe('Employer My Jobs')
 })
+
+test('student profile includeJobs=true should return empty jobs array and not crash', async () => {
+  const student = await User.create({ name: 'Student1', email: 'student1@example.com', password: 'p', role: 'student', phone: '+914' })
+  const tokenStudent = jwt.sign({ id: student._id, email: student.email, role: student.role }, process.env.JWT_SECRET)
+
+  const profileRes = await request(app).get(`/api/users/${student._id}?includeJobs=true`).set('Authorization', `Bearer ${tokenStudent}`).expect(200)
+
+  expect(profileRes.body.success).toBe(true)
+  expect(Array.isArray(profileRes.body.data.jobs)).toBe(true)
+  expect(profileRes.body.data.jobs.length).toBe(0)
+})
