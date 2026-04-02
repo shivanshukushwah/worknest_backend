@@ -323,6 +323,11 @@ const applyForJob = async (req, res) => {
     const job = await Job.findById(req.params.id)
     if (!job) return res.status(404).json({ success: false, message: "Job not found" })
 
+    // Initialize applications array if missing (for old documents)
+    if (!job.applications) {
+      job.applications = []
+    }
+
     // prevent duplicate applications
     const already = job.applications.find(a => String(a.student) === String(req.user.id))
     if (already) {
@@ -431,6 +436,11 @@ const acceptApplication = async (req, res) => {
     const job = await Job.findById(id)
     if (!job) return res.status(404).json({ success: false, message: "Job not found" })
 
+    // Initialize applications array if missing (for old documents)
+    if (!job.applications) {
+      job.applications = []
+    }
+
     // only the employer who posted the job can accept an application
     if (String(job.employer) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: "Forbidden: only employer can accept applications" })
@@ -526,6 +536,11 @@ const rejectApplication = async (req, res) => {
     const job = await Job.findById(id)
     if (!job) return res.status(404).json({ success: false, message: "Job not found" })
 
+    // Initialize applications array if missing (for old documents)
+    if (!job.applications) {
+      job.applications = []
+    }
+
     // only employer who posted the job can reject
     if (String(job.employer) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: "Forbidden: only employer can reject applications" })
@@ -584,6 +599,11 @@ const forceInspectApplication = async (req, res) => {
     const { id, applicationId } = req.params
     const job = await Job.findById(id)
     if (!job) return res.status(404).json({ success: false, message: "Job not found" })
+
+    // Initialize applications array if missing (for old documents)
+    if (!job.applications) {
+      job.applications = []
+    }
 
     // only employer who posted the job or admin can force inspect
     if (String(job.employer) !== String(req.user.id) && req.user.role !== 'admin') {
@@ -956,6 +976,7 @@ const getMyApplications = async (req, res) => {
 
     // Extract application details for each job
     const myApplications = jobs.map(job => {
+      if (!job.applications || !Array.isArray(job.applications)) return null
       const application = job.applications.find(a => String(a.student) === String(req.user.id))
       if (!application) return null
 
@@ -1014,6 +1035,11 @@ const shortlistApplication = async (req, res) => {
 
     const job = await Job.findById(id)
     if (!job) return res.status(404).json({ success: false, message: "Job not found" })
+
+    // Initialize applications array if missing (for old documents)
+    if (!job.applications) {
+      job.applications = []
+    }
 
     if (String(job.employer) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: "Forbidden" })
