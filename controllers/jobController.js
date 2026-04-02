@@ -12,6 +12,33 @@ const getUserId = (user) => user?.id || user?._id
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(String(id))
 
+const normalizeJob = (job) => {
+  if (!job) return null
+
+  const safeLocation = job.location && typeof job.location === 'object' ? job.location : {
+    city: '',
+    state: '',
+    country: '',
+    coordinates: { latitude: null, longitude: null },
+  }
+
+  const safeEmployer = job.employer && typeof job.employer === 'object' ? job.employer : {
+    _id: null,
+    name: '',
+    businessName: '',
+  }
+
+  return {
+    ...job,
+    applications: Array.isArray(job.applications) ? job.applications : [],
+    location: safeLocation,
+    employer: safeEmployer,
+    assignedStudents: Array.isArray(job.assignedStudents) ? job.assignedStudents : [],
+    assignedStudent: job.assignedStudent || null,
+    submission: job.submission || { description: '', attachments: [], submittedAt: null },
+  }
+}
+
 // @desc    Create a new job
 // @route   POST /api/jobs
 // @access  Private (Employer only)
@@ -144,6 +171,8 @@ const getJobs = async (req, res) => {
       .skip(skip)
       .limit(limitNum);
 
+    jobs = jobs.map(normalizeJob)
+
     // Apply location-based filtering for workers viewing all jobs
     if (req.user && (req.user.role === 'worker' || req.user.role === 'student') && mine !== "true") {
       const student = await User.findById(req.user.id);
@@ -177,12 +206,10 @@ const getJobById = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid job ID" })
     }
 
-    const job = await Job.findById(id).populate("employer", "name businessName").lean();
+    let job = await Job.findById(id).populate("employer", "name businessName").lean();
     if (!job) return res.status(404).json({ success: false, message: "Job not found" });
 
-    // Ensure at least default form for fields expected by UI
-    job.applications = Array.isArray(job.applications) ? job.applications : []
-    job.location = job.location || null
+    job = normalizeJob(job)
 
     return res.json({ success: true, data: job });
   } catch (err) {
@@ -254,10 +281,12 @@ const getMyJobs = async (req, res) => {
     
     const employerId = new mongoose.Types.ObjectId(getUserId(req.user));
     const total = await Job.countDocuments({ employer: employerId });
-    const jobs = await Job.find({ employer: employerId })
+    let jobs = await Job.find({ employer: employerId })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
+
+    jobs = jobs.map(normalizeJob)
       
     return res.json({
       success: true,
@@ -994,6 +1023,7 @@ const getMyApplications = async (req, res) => {
 
     // Extract application details for each job
     const myApplications = jobs.map(job => {
+      job = normalizeJob(job)
       if (!job.applications || !Array.isArray(job.applications)) return null
       const application = job.applications.find(a => String(a.student) === String(req.user.id))
       if (!application) return null
