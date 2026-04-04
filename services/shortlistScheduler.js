@@ -117,11 +117,15 @@ async function processDueShortlists() {
 function startShortlistScheduler({ intervalMs = 60 * 1000 } = {}) {
   if (intervalHandle) return
   // Run immediately and then at interval
-  processOfflineJobAutoClose()
-  processDueShortlists()
+  processOfflineJobAutoClose().catch(err => console.error('Initial offline job auto-close error:', err))
+  processDueShortlists().catch(err => console.error('Initial due shortlists error:', err))
   intervalHandle = setInterval(async () => {
-    await processOfflineJobAutoClose()
-    await processDueShortlists()
+    try {
+      await processOfflineJobAutoClose()
+      await processDueShortlists()
+    } catch (err) {
+      console.error('Scheduler interval error:', err)
+    }
   }, intervalMs)
   console.log('Shortlist & auto-close scheduler started (intervalMs=', intervalMs, ')')
 }

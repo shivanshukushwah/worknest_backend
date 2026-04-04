@@ -47,7 +47,12 @@ app.use("/api/users", usersRouter);
 app.use("/api/reviews", reviewsRouter);
 
 /* =======================
-   ✅ Other Controllers
+   ✅ Error Handler
+   ======================= */
+app.use(require('./middleware/errorHandler'));
+
+/* =======================
+   ✅ Health Check
    ======================= */
 const adminController = require("./controllers/adminController");
 const notificationRouter = require("./routes/notification");
@@ -99,3 +104,15 @@ if (require.main === module) {
 }
 
 module.exports = app;
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
