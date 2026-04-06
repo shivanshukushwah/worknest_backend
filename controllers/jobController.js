@@ -162,8 +162,32 @@ const getJobs = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const limitNum = parseInt(limit);
 
-    const query = {};
-    if (mine === "true" && req.user) query.employer = getUserId(req.user);
+    const query: any = {};
+    if (mine === "true" && req.user) {
+      query.employer = getUserId(req.user);
+    } else if (req.user && (req.user.role === 'worker' || req.user.role === 'student')) {
+      // For students/workers viewing jobs:
+      // 1. Only show OPEN jobs
+      query.status = JOB_STATUS.OPEN;
+      
+      const student = await User.findById(req.user.id);
+      if (student && student.location) {
+        const city = student.location.city || "";
+        const state = student.location.state || "";
+        
+        // Match online jobs OR offline jobs in student's city/state
+        query.$or = [
+          { jobType: 'online' },
+          { 
+            jobType: 'offline',
+            $or: [
+              { "location.city": new RegExp(`^${city}$`, "i") },
+              { "location.state": new RegExp(`^${state}$`, "i") }
+            ]
+          }
+        ];
+      }
+    }
 
     const total = await Job.countDocuments(query);
     let jobs = await Job.find(query)
@@ -171,16 +195,18 @@ const getJobs = async (req, res) => {
       .skip(skip)
       .limit(limitNum);
 
-    jobs = jobs.map(normalizeJob)
+    jobs = jobs.map(normalizeJob);
 
-    // Apply location-based filtering for workers viewing all jobs
-    if (req.user && (req.user.role === 'worker' || req.user.role === 'student') && mine !== "true") {
-      const student = await User.findById(req.user.id);
-      if (student && student.location) {
-        const { filterJobsByType } = require('../services/locationService');
-        jobs = filterJobsByType(jobs, student.location, 50); // 50km radius
+    return res.json({
+      success: true,
+      data: jobs,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum)
       }
-    }
+    });
 
     return res.json({
       success: true,
