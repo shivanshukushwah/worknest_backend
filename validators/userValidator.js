@@ -7,7 +7,13 @@ const validateProfileUpdate = (data, userRole) => {
     bio: Joi.string().max(300),
     avatar: Joi.string().uri(),
     age: Joi.number().integer().min(13).max(100),
-    userType: Joi.string().valid("student", "worker"), // Allow userType to be updated during profile completion
+    userType: Joi.string().valid("student", "worker"),
+    // Allow top-level location fields for flattening
+    city: Joi.string().max(100).allow('', null),
+    state: Joi.string().max(100).allow('', null),
+    country: Joi.string().max(100).allow('', null),
+    businessCity: Joi.string().max(100).allow('', null),
+    businessState: Joi.string().max(100).allow('', null),
   }
 
   // Add role-specific validation

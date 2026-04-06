@@ -177,9 +177,11 @@ const getUserById = async (req, res) => {
 
     // Flatten location for students/workers in response
     if (user.location) {
-      responseData.city = user.location.city
-      responseData.state = user.location.state
-      responseData.country = user.location.country
+      responseData.city = user.location.city;
+      responseData.state = user.location.state;
+      responseData.country = user.location.country;
+      // Also provide a string version for backward compatibility
+      responseData.locationText = `${user.location.city}, ${user.location.state}`;
     }
 
     ResponseHelper.success(res, responseData, "User profile retrieved successfully")
