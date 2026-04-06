@@ -41,11 +41,13 @@ router.get("/employer/me", authorize("employer"), async (req, res) => {
   req.params.id = req.user.id;
   return getUserById(req, res);
 });
+router.put("/employer/me", authorize("employer"), updateProfile);
 router.get("/student/me", authorize("student"), async (req, res) => {
   const { getUserById } = require("../controllers/userController");
   req.params.id = req.user.id;
   return getUserById(req, res);
 });
+router.put("/student/me", authorize("student"), updateProfile);
 router.delete("/deactivate", deactivateAccount)
 
 // User discovery

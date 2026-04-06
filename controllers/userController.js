@@ -49,6 +49,21 @@ const updateProfile = async (req, res) => {
       }
     }
 
+    // Handle location for students/workers
+    if (req.user.role === 'student' || req.user.role === 'worker') {
+      if (updateData.city || updateData.state || updateData.country) {
+        updateData.location = {
+          ...((await User.findById(userId)).location?.toObject() || {}),
+          ...(updateData.city && { city: updateData.city }),
+          ...(updateData.state && { state: updateData.state }),
+          ...(updateData.country && { country: updateData.country }),
+        }
+        delete updateData.city
+        delete updateData.state
+        delete updateData.country
+      }
+    }
+
     // Handle avatar upload if provided
     if (req.file) {
       try {
@@ -81,7 +96,20 @@ const updateProfile = async (req, res) => {
       await updatedUser.save()
     }
 
-    ResponseHelper.success(res, updatedUser, "Profile updated successfully")
+    const responseUser = updatedUser.toObject()
+    // Flatten location for response
+    if (responseUser.location) {
+      responseUser.city = responseUser.location.city
+      responseUser.state = responseUser.location.state
+      responseUser.country = responseUser.location.country
+    }
+    // Flatten businessAddress for employers
+    if (responseUser.businessAddress) {
+      responseUser.businessCity = responseUser.businessAddress.city
+      responseUser.businessState = responseUser.businessAddress.state
+    }
+
+    ResponseHelper.success(res, responseUser, "Profile updated successfully")
   } catch (error) {
     console.error("Update profile error:", error)
     ResponseHelper.error(res, "Server error during profile update", 500)
@@ -139,6 +167,19 @@ const getUserById = async (req, res) => {
           responseData.jobs = []
         }
       }
+      
+      // Flatten businessAddress for response
+      if (user.businessAddress) {
+        responseData.businessCity = user.businessAddress.city
+        responseData.businessState = user.businessAddress.state
+      }
+    }
+
+    // Flatten location for students/workers in response
+    if (user.location) {
+      responseData.city = user.location.city
+      responseData.state = user.location.state
+      responseData.country = user.location.country
     }
 
     ResponseHelper.success(res, responseData, "User profile retrieved successfully")

@@ -149,6 +149,18 @@ exports.register = async (req, res) => {
     delete respUser.emailOtpAttempts
     delete respUser.emailOtpBlocked
 
+    // Flatten location for response
+    if (respUser.location) {
+      respUser.city = respUser.location.city
+      respUser.state = respUser.location.state
+      respUser.country = respUser.location.country
+    }
+    // Flatten businessAddress for employers
+    if (respUser.businessAddress) {
+      respUser.businessCity = respUser.businessAddress.city
+      respUser.businessState = respUser.businessAddress.state
+    }
+
     // compute profile completion ignoring email verification (which is false)
     let profileInfo = {}
     try {
@@ -224,6 +236,18 @@ exports.login = async (req, res) => {
     delete userObj.emailOtpSentAt
     delete userObj.emailOtpAttempts
     delete userObj.emailOtpBlocked
+
+    // Flatten location for response
+    if (userObj.location) {
+      userObj.city = userObj.location.city
+      userObj.state = userObj.location.state
+      userObj.country = userObj.location.country
+    }
+    // Flatten businessAddress for employers
+    if (userObj.businessAddress) {
+      userObj.businessCity = userObj.businessAddress.city
+      userObj.businessState = userObj.businessAddress.state
+    }
 
     res.json({
       success: true,
@@ -310,6 +334,18 @@ exports.verifyOtp = async (req, res) => {
     delete userObj.emailOtpSentAt
     delete userObj.emailOtpAttempts
     delete userObj.emailOtpBlocked
+
+    // Flatten location for response
+    if (userObj.location) {
+      userObj.city = userObj.location.city
+      userObj.state = userObj.location.state
+      userObj.country = userObj.location.country
+    }
+    // Flatten businessAddress for employers
+    if (userObj.businessAddress) {
+      userObj.businessCity = userObj.businessAddress.city
+      userObj.businessState = userObj.businessAddress.state
+    }
 
     res.json({ 
       success: true, 
