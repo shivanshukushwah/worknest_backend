@@ -1,5 +1,6 @@
 const User = require("../models/User")
 const Job = require("../models/Job")
+const Wallet = require("../models/Wallet")
 const ResponseHelper = require("../utils/responseHelper")
 const { JOB_STATUS } = require("../utils/constants")
 const { validateProfileUpdate } = require("../validators/userValidator")
@@ -108,6 +109,11 @@ const getUserById = async (req, res) => {
     // attach computed profile completion info so clients don't need a second call
     const profileValidation = validateProfileCompletion(user, { ignoreEmailVerification: true, includeOptional: true })
     const responseData = user.toObject()
+    
+    // Fetch and attach wallet balance
+    const wallet = await Wallet.findOne({ user: user._id })
+    responseData.walletBalance = wallet ? wallet.balance : 0
+    
     responseData.profileCompletion = {
       isProfileComplete: profileValidation.isComplete,
       missingFields: profileValidation.missingFields,
