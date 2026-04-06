@@ -162,7 +162,7 @@ const getJobs = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const limitNum = parseInt(limit);
 
-    const query: any = {};
+    const query = {};
     if (mine === "true" && req.user) {
       query.employer = getUserId(req.user);
     } else if (req.user && (req.user.role === 'worker' || req.user.role === 'student')) {
