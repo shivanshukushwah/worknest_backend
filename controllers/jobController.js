@@ -170,22 +170,27 @@ const getJobs = async (req, res) => {
       // 1. Only show OPEN jobs
       query.status = JOB_STATUS.OPEN;
       
-      const student = await User.findById(req.user.id);
+      const userId = getUserId(req.user);
+      const student = await User.findById(userId);
+      
       if (student && student.location) {
-        const city = student.location.city || "";
-        const state = student.location.state || "";
+        const city = (student.location.city || "").trim();
+        const state = (student.location.state || "").trim();
         
         // Match online jobs OR offline jobs in student's city/state
-        query.$or = [
-          { jobType: 'online' },
-          { 
-            jobType: 'offline',
-            $or: [
-              { "location.city": new RegExp(`^${city}$`, "i") },
-              { "location.state": new RegExp(`^${state}$`, "i") }
-            ]
-          }
-        ];
+        // If student has no city/state set in their profile, they should see ALL open jobs
+        if (city || state) {
+          query.$or = [
+            { jobType: 'online' },
+            { 
+              jobType: 'offline',
+              $or: [
+                ...(city ? [{ "location.city": new RegExp(`^${city}$`, "i") }] : []),
+                ...(state ? [{ "location.state": new RegExp(`^${state}$`, "i") }] : [])
+              ]
+            }
+          ];
+        }
       }
     }
 
@@ -196,17 +201,6 @@ const getJobs = async (req, res) => {
       .limit(limitNum);
 
     jobs = jobs.map(normalizeJob);
-
-    return res.json({
-      success: true,
-      data: jobs,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: limitNum,
-        pages: Math.ceil(total / limitNum)
-      }
-    });
 
     return res.json({
       success: true,
