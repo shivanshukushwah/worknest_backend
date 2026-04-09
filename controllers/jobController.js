@@ -28,15 +28,24 @@ const normalizeJob = (job) => {
     businessName: '',
   }
 
-  return {
+  // Ensure compatibility between 'budget' and 'salary', 'jobType' and 'type'
+  const normalized = {
     ...job,
+    id: job.id || job._id,
+    salary: job.salary || job.budget || 0,
+    salaryType: job.salaryType || 'fixed',
+    type: job.type || job.jobType || 'offline',
+    jobType: job.jobType || job.type || 'offline',
     applications: Array.isArray(job.applications) ? job.applications : [],
     location: safeLocation,
     employer: safeEmployer,
     assignedStudents: Array.isArray(job.assignedStudents) ? job.assignedStudents : [],
     assignedStudent: job.assignedStudent || null,
+    deadline: job.deadline || job.shortlistWindowEndsAt || null,
     submission: job.submission || { description: '', attachments: [], submittedAt: null },
   }
+
+  return normalized
 }
 
 // @desc    Create a new job
@@ -109,6 +118,7 @@ const createJob = async (req, res) => {
       submissionRequiresFiles: false,
       escrowAmount: budgetNum,
       status: JOB_STATUS.OPEN,
+      deadline: new Date(Date.now() + applicationDeadlineHoursNum * 60 * 60 * 1000), // Set universal deadline
     }
     // Add location for offline jobs
     if (jobType === 'offline' && location) {
@@ -170,6 +180,13 @@ const getJobs = async (req, res) => {
       // 1. Only show OPEN jobs
       query.status = JOB_STATUS.OPEN;
       
+      // 2. Hide jobs whose deadline has passed
+      // For backward compatibility, also show jobs where deadline doesn't exist
+      query.$or = [
+        { deadline: { $gt: new Date() } },
+        { deadline: { $exists: false } }
+      ];
+
       const userId = getUserId(req.user);
       const student = await User.findById(userId);
       
@@ -179,14 +196,16 @@ const getJobs = async (req, res) => {
         
         // Match online jobs OR offline jobs in student's city/state
         // If student has no city/state set in their profile, they should see ALL open jobs
+        // Match online jobs OR offline jobs in student's city/state
+        // If student has no city/state set in their profile, they should see ALL open jobs
         if (city || state) {
           query.$or = [
             { jobType: 'online' },
             { 
               jobType: 'offline',
               $or: [
-                ...(city ? [{ "location.city": new RegExp(`^${city}$`, "i") }] : []),
-                ...(state ? [{ "location.state": new RegExp(`^${state}$`, "i") }] : [])
+                ...(city ? [{ "location.city": new RegExp(city, "i") }] : []),
+                ...(state ? [{ "location.state": new RegExp(state, "i") }] : [])
               ]
             }
           ];
@@ -196,11 +215,29 @@ const getJobs = async (req, res) => {
 
     const total = await Job.countDocuments(query);
     let jobs = await Job.find(query)
+      .populate("employer", "name businessName avatar")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    jobs = jobs.map(normalizeJob);
+    const userId = getUserId(req.user);
+    const isStudent = req.user && (req.user.role === 'worker' || req.user.role === 'student');
+
+    jobs = jobs.map(j => {
+      const jobObj = j.toObject ? j.toObject() : j;
+      const normalized = normalizeJob(jobObj);
+      
+      // If student, attach their specific application status
+      if (isStudent && userId) {
+        const myApp = (jobObj.applications || []).find(a => String(a.student) === String(userId));
+        if (myApp) {
+          normalized.applicationStatus = myApp.status;
+          normalized.applicationId = myApp._id;
+        }
+      }
+      
+      return normalized;
+    });
 
     return res.json({
       success: true,

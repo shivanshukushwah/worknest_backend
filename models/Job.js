@@ -52,6 +52,7 @@ const jobSchema = new mongoose.Schema({
   shortlistComputed: { type: Boolean, default: false },
   shortlistedAt: { type: Date },
   status: { type: String, default: JOB_STATUS.OPEN },
+  deadline: { type: Date }, // Absolute expiry time for both online and offline jobs
   closedAt: { type: Date },
   shortlistedAt: { type: Date },
   escrowAmount: { type: Number, default: 0 },
