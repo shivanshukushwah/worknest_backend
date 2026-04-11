@@ -73,6 +73,10 @@ app.get("/", (req, res) => {
 /* =======================
    ✅ Server Start
    ======================= */
+// Initialize job cleanup service (auto-close expired jobs)
+const { initJobCleanup } = require('./services/jobCleanupService');
+initJobCleanup();
+
 const PORT = process.env.PORT || 5000;
 const HOST = "0.0.0.0";
 

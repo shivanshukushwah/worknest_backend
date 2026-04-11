@@ -123,6 +123,7 @@ const createJob = async (req, res) => {
     // Add location for offline jobs
     if (jobType === 'offline' && location) {
       jobData.location = {
+        address: location.address || '',
         city: location.city,
         state: location.state,
         country: location.country || 'India', // default to India
@@ -1086,25 +1087,21 @@ const getMyApplications = async (req, res) => {
       if (!application) return null
 
       return {
+        id: application._id,
         applicationId: application._id,
         jobId: job._id,
-        jobTitle: job.title,
-        jobDescription: job.description,
-        jobCategory: job.category,
-        jobType: job.jobType || 'offline',
-        budget: job.budget,
-        duration: job.duration,
-        location: job.location || null,
-        employer: job.employer,
+        studentId: req.user.id,
+        status: application.status,
+        appliedAt: application.createdAt,
+        job: {
+          ...job,
+          id: job._id,
+        },
         coverLetter: application.coverLetter || '',
         proposedBudget: application.proposedBudget || null,
-        status: application.status,
+        profileUrl: application.profileUrl || null,
         shortlisted: application.shortlisted || false,
         evaluationScore: application.evaluationScore || 0,
-        profileUrl: application.profileUrl || null,
-        appliedAt: application.createdAt,
-        jobStatus: job.status,
-        jobCreatedAt: job.createdAt,
       }
     }).filter(a => a !== null)
 

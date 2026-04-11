@@ -35,6 +35,7 @@ const jobSchema = new mongoose.Schema({
   jobType: { type: String, enum: ['offline', 'online'], default: 'offline' },
   // Location (for offline jobs)
   location: {
+    address: String,
     city: String,
     state: String,
     country: String,
